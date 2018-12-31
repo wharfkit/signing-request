@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "declaration": true,
+    "lib": ["esnext", "dom"],
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "outDir": "lib",
+    "downlevelIteration": true,
+    "target": "esnext",
+    "strict": true,
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
+}

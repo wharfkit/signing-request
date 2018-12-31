@@ -1,0 +1,14 @@
+{
+  "defaultSeverity": "error",
+  "extends": ["tslint:recommended"],
+  "rules": {
+    "indent": [true, "spaces", 4],
+    "interface-name": [true, "never-prefix"],
+    "max-classes-per-file": false,
+    "no-bitwise": false,
+    "object-literal-sort-keys": false,
+    "quotemark": [true, "single", "avoid-escape"],
+    "semicolon": [true, "never"],
+    "triple-equals": [true, "allow-null-check"]
+  }
+}

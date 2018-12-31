@@ -1,0 +1,24 @@
+{
+  "name": "eosio-uri",
+  "version": "0.0.1",
+  "description": "eosio:// uri encoder and decoder",
+  "license": "MIT",
+  "main": "./lib/index",
+  "typings": "./lib/index",
+  "scripts": {
+    "prepublish": "make lib"
+  },
+  "files": [
+    "lib/*"
+  ],
+  "dependencies": {
+    "base-x": "^3.0.5",
+    "eosjs": "^20.0.0-beta3"
+  },
+  "devDependencies": {
+    "@types/base-x": "^3.0.0",
+    "@types/node": "^10.12.18",
+    "tslint": "^5.12.0",
+    "typescript": "^3.2.2"
+  }
+}
