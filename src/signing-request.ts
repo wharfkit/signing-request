@@ -5,7 +5,7 @@
 import {Serialize} from 'eosjs'
 
 import * as abi from './abi'
-import {base58Decode, base58Encode} from './base58'
+import * as base64u from './base64u'
 
 const AbiTypes = Serialize.getTypesFromAbi(Serialize.createInitialTypes(), abi.data as any)
 
@@ -152,7 +152,7 @@ export class SigningRequest {
         if (proto !== 'eosio:' && proto !== 'web+eosio:') {
             throw new Error('Invalid protocol')
         }
-        const data = base58Decode(encoded)
+        const data = base64u.decode(encoded)
         const header = data[0]
         const version = header & ~(1 << 7)
         if (version !== 1) {
@@ -233,7 +233,7 @@ export class SigningRequest {
         const data = new Uint8Array(array.byteLength + 1)
         data[0] = header
         data.set(array, 1)
-        return 'eosio://' + base58Encode(data)
+        return 'eosio://' + base64u.encode(data)
     }
 
     /** Resolve request into a transaction that can be signed. */
