@@ -14,7 +14,7 @@ export function encode(data: Uint8Array): string {
     const byteRemainder = byteLength % 3
     const mainLength = byteLength - byteRemainder
 
-    let parts: string[] = []
+    const parts: string[] = []
 
     let a: number
     let b: number
@@ -63,8 +63,8 @@ export function encode(data: Uint8Array): string {
 }
 
 export function decode(input: string): Uint8Array {
-    let byteLength = input.length * 0.75
-    let data = new Uint8Array(byteLength)
+    const byteLength = input.length * 0.75
+    const data = new Uint8Array(byteLength)
 
     let a: number
     let b: number
@@ -74,9 +74,9 @@ export function decode(input: string): Uint8Array {
 
     for (let i = 0; i < input.length; i += 4) {
         a = lookup[input.charCodeAt(i)]
-        b = lookup[input.charCodeAt(i+1)]
-        c = lookup[input.charCodeAt(i+2)]
-        d = lookup[input.charCodeAt(i+3)]
+        b = lookup[input.charCodeAt(i + 1)]
+        c = lookup[input.charCodeAt(i + 2)]
+        d = lookup[input.charCodeAt(i + 3)]
 
         data[p++] = (a << 2) | (b >> 4)
         data[p++] = ((b & 15) << 4) | (c >> 2)
