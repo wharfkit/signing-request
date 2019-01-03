@@ -26,6 +26,40 @@ export interface ZlibProvider {
     inflateRaw: (data: Uint8Array) => Uint8Array
 }
 
+/**
+ * Context used to resolve a callback.
+ * Compatible with the JSON response from a `push_transaction` call.
+ */
+export interface CallbackContext {
+    /** The resulting transaction id. */
+    transaction_id: string // 32-byte hex-encoded checksum
+    processed: {
+        /** The block id where transaction was included. */
+        id: string // 32-byte hex-encoded checksum
+        /** The block number where transaction was included. */
+        block_num: number,
+    }
+}
+
+/**
+ * Context used to resolve a callback.
+ * Compatible with the JSON response from a `push_transaction` call.
+ */
+export interface ResolvedCallback {
+    /** The URL to hit. */
+    url: string
+    /**
+     * Whether to run the request in the background. For a https url this
+     * means POST in the background instead of a GET redirect.
+     */
+    background: boolean
+    /**
+     * The resolved context, for a https POST this should be included in
+     * the request body as JSON.
+     */
+    ctx: {[key: string]: string}
+}
+
 /** A 32-byte hex-encoded string representing a chain id. */
 export type ChainId = string
 
@@ -176,6 +210,17 @@ export class SigningRequest {
         )
     }
 
+    /**
+     * Pattern used to resolve callback URLs.
+     * sig(N) = signature string, always present
+     *          where N signifies the signature 0-index if there are multiple
+     *          omitting the N is equivalent to sig0
+     * bi = block id string, present if broadcast
+     * bn = block number, present if broadcast
+     * tx = transaction id string, present if broadcast
+     */
+    private static CALLBACK_PATTERN = /({{(sig\d*|bi|bn|tx)}})/g
+
     /** The signing request version. */
     public version: number
 
@@ -273,15 +318,42 @@ export class SigningRequest {
         return tx
     }
 
-    /** Resolve callback url. */
-    public getCallback() {
+    /**
+     * Resolve callback.
+     * @argument signatures The signature(s) of the resolved transaction.
+     * @argument context The result of the push_transaction call if transaction was broadcast.
+     * @returns An object containing the resolved URL and context or null if no callback is present.
+     */
+    public getCallback(signatures: string | string[], context?: CallbackContext): ResolvedCallback | null {
         const callback = this.data.callback
         if (!callback) { return null }
-        // TODO: define templating interface
-        // TODO: resolve templates with args passed
+        if (this.data.broadcast && !context) {
+            throw new Error('Must provide callback context for broadcast request')
+        }
+        if (typeof signatures === 'string') {
+            signatures = [signatures]
+        }
+        if (signatures.length === 0) {
+            throw new Error('Must have at least one signature to resolve callback')
+        }
+        const ctx: {[key: string]: string} = {
+            sig: signatures[0],
+        }
+        for (const [n, sig] of signatures.entries()) {
+            ctx[`sig${ n }`] = sig
+        }
+        if (context) {
+            ctx.tx = context.transaction_id
+            ctx.bi = context.processed.id
+            ctx.bn = String(context.processed.block_num)
+        }
+        const url = callback.url.replace(SigningRequest.CALLBACK_PATTERN, (_1, _2, m) => {
+            return ctx[m] || ''
+        })
         return {
-            method: callback.background ? 'POST' : 'GET',
-            url: callback.url,
+            background: callback.background,
+            ctx,
+            url,
         }
     }
 
