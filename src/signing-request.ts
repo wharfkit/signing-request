@@ -18,11 +18,11 @@ export interface AbiProvider {
     getAbi: (account: string) => Promise<any>
 }
 
-/** Interface that should be iplemented by zlib implementations. */
+/** Interface that should be implemented by zlib implementations. */
 export interface ZlibProvider {
     /** Deflate data w/o adding zlib header. */
     deflateRaw: (data: Uint8Array) => Uint8Array
-    /** Inflate data w/o requring zlib header. */
+    /** Inflate data w/o requiring zlib header. */
     inflateRaw: (data: Uint8Array) => Uint8Array
 }
 
@@ -360,7 +360,7 @@ export class SigningRequest {
             }
         }
         for (const action of tx.actions) {
-            // TODO: resolve authorirty name placeholders
+            // TODO: resolve authority name placeholders
             //       is there a name that can be safely used to indicate placeholder
             //       or does the protocol need to be extended to say what name is the placeholder?
         }
