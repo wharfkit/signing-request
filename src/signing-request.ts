@@ -60,6 +60,28 @@ export interface ResolvedCallback {
     ctx: {[key: string]: string}
 }
 
+/**
+ * Context used to resolve a transaction.
+ * Compatible with the JSON response from a `get_block` call.
+ */
+export interface TransactionContext {
+    /** Timestamp expiration will be derived from. */
+    timestamp?: string
+    /**
+     * How many seconds in the future to set expiration when deriving from timestamp.
+     * Defaults to 60 seconds if unset.
+     */
+    expire_seconds?: number
+    /** Block number ref_block_num will be derived from. */
+    block_num?: number
+    /** Reference block number, takes precedence over block_num if both is set. */
+    ref_block_num?: number
+    /** Reference block prefix. */
+    ref_block_prefix?: number
+    /** Expiration timestamp, takes precedence over timestamp and expire_seconds if set. */
+    expiration?: string
+}
+
 /** A 32-byte hex-encoded string representing a chain id. */
 export type ChainId = string
 
@@ -139,10 +161,19 @@ export class SigningRequest {
         } else if (args.actions && !args.action && !args.transaction) {
             data.req = ['action[]', await Promise.all(args.actions.map(serializeAction))]
         } else if (args.transaction && !args.action && !args.actions) {
-            // TODO: handle partial transactions, should set default values (options?)
-            //       and also set TAPoS values to something invalid that can be detected later
-            //       and serialize the actions if they are not already
-            data.req = ['transaction', args.transaction]
+            const tx = args.transaction
+            // set default values if missing
+            if (tx.expiration === undefined) { tx.expiration = '1970-01-01T00:00:00.000' }
+            if (tx.ref_block_num === undefined) { tx.ref_block_num = 0 }
+            if (tx.ref_block_prefix === undefined) { tx.ref_block_prefix = 0 }
+            if (tx.context_free_actions === undefined) { tx.context_free_actions = [] }
+            if (tx.transaction_extensions === undefined) { tx.transaction_extensions = [] }
+            if (tx.delay_sec === undefined) { tx.delay_sec = 0 }
+            if (tx.max_cpu_usage_ms === undefined) { tx.max_cpu_usage_ms = 0 }
+            if (tx.max_net_usage_words === undefined) { tx.max_net_usage_words = 0 }
+            // encode actions if needed
+            tx.actions = await Promise.all(tx.actions.map(serializeAction))
+            data.req = ['transaction', tx]
         } else {
             throw new TypeError('Invalid arguments: Must have exactly one of action, actions or transaction')
         }
@@ -282,7 +313,7 @@ export class SigningRequest {
     }
 
     /** Resolve request into a transaction that can be signed. */
-    public getTransaction() {
+    public getTransaction(ctx: TransactionContext) {
         const req = this.data.req
         let tx: abi.Transaction
         switch (req[0]) {
@@ -295,7 +326,6 @@ export class SigningRequest {
                     expiration: '1970-01-01T00:00:00.000',
                     ref_block_num: 0,
                     ref_block_prefix: 0,
-                    // TODO: options for these?
                     max_cpu_usage_ms: 0,
                     max_net_usage_words: 0,
                     delay_sec: 0,
@@ -308,7 +338,26 @@ export class SigningRequest {
                 throw new Error('Invalid signing request data')
         }
         if (tx.expiration === '1970-01-01T00:00:00.000' && tx.ref_block_num === 0 && tx.ref_block_prefix === 0) {
-            // TODO: add TAPoS values. require pass in every time or use a "BlockProvider" interface?
+            if (
+                ctx.expiration !== undefined &&
+                ctx.ref_block_num !== undefined &&
+                ctx.ref_block_prefix !== undefined
+            ) {
+                tx.expiration = ctx.expiration
+                tx.ref_block_num = ctx.ref_block_num
+                tx.ref_block_prefix = ctx.ref_block_prefix
+            } else if (
+                ctx.block_num !== undefined &&
+                ctx.ref_block_prefix !== undefined &&
+                ctx.timestamp !== undefined
+            ) {
+                const header = Serialize.transactionHeader(ctx as any, ctx.expire_seconds || 60)
+                tx.expiration = header.expiration
+                tx.ref_block_num = header.ref_block_num
+                tx.ref_block_prefix = header.ref_block_prefix
+            } else {
+                throw new Error('Invalid transaction context, need either a reference block or explicit TAPoS values')
+            }
         }
         for (const action of tx.actions) {
             // TODO: resolve authorirty name placeholders
@@ -333,7 +382,7 @@ export class SigningRequest {
         if (typeof signatures === 'string') {
             signatures = [signatures]
         }
-        if (signatures.length === 0) {
+        if (!signatures || signatures.length === 0) {
             throw new Error('Must have at least one signature to resolve callback')
         }
         const ctx: {[key: string]: string} = {
