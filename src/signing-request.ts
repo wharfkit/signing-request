@@ -97,6 +97,37 @@ const ChainIdLookup = new Map<ChainName, ChainId>([
     [ChainName.TELOS, '4667b205c6838ef70ff7988f6e8257e8be0e1284a2f59699054a018f743b1d11'],
 ])
 
+/**
+ * The placeholder name: `............1` aka `uint64(1)`.
+ * If used in action data will be resolved to current signer.
+ * If used in as an authorization permission will be resolved to
+ * the signers permission level.
+ *
+ * Example action:
+ * ```
+ * { account: "eosio.token",
+ *   name: "transfer",
+ *   authorization: [{actor: "............1", permission: "............1"}],
+ *   data: {
+ *     from: "............1",
+ *     to: "bar",
+ *     quantity: "42.0000 EOS",
+ *     memo: "Don't panic" }}
+ * ```
+ * When signed by `foo@active` would resolve to:
+ * ```
+ * { account: "eosio.token",
+ *   name: "transfer",
+ *   authorization: [{actor: "foo", permission: "active"}],
+ *   data: {
+ *     from: "foo",
+ *     to: "bar",
+ *     quantity: "42.0000 EOS",
+ *     memo: "Don't panic" }}
+ * ```
+ */
+export const PlaceholderName = '............1' // aka uint64(1)
+
 export interface SigningRequestCreateArguments {
     /** Single action to create request with. */
     action?: abi.Action
@@ -312,8 +343,30 @@ export class SigningRequest {
         return 'eosio://' + base64u.encode(data)
     }
 
-    /** Resolve request into a transaction that can be signed. */
-    public getTransaction(ctx: TransactionContext) {
+    /**
+     * Resolve request into a transaction that can be signed.
+     * @param signer The auth that will sign the transaction, in the format
+     *               `account@level` or {actor: 'account', permission: 'level'}.
+     * @param ctx The TAPoS values to use when resolving the transaction.
+     * @param abiProvider The abi provider to use to decode action data,
+     *                    will use the instance abiProvider if unset.
+     */
+    public async getTransaction(
+        signer: string | abi.PermissionLevel,
+        ctx: TransactionContext,
+        abiProvider?: AbiProvider,
+    ) {
+        if (typeof signer === 'string') {
+            const [actor, permission] = signer.split('@')
+            signer = {actor, permission}
+        }
+        if (
+            typeof signer !== 'object' ||
+            typeof signer.actor !== 'string' ||
+            typeof signer.permission !== 'string'
+        ) {
+            throw new TypeError('Invalid signer')
+        }
         const req = this.data.req
         let tx: abi.Transaction
         switch (req[0]) {
@@ -359,12 +412,37 @@ export class SigningRequest {
                 throw new Error('Invalid transaction context, need either a reference block or explicit TAPoS values')
             }
         }
-        for (const action of tx.actions) {
-            // TODO: resolve authority name placeholders
-            //       is there a name that can be safely used to indicate placeholder
-            //       or does the protocol need to be extended to say what name is the placeholder?
+        const provider = abiProvider || this.abiProvider
+        if (!provider) {
+            throw new Error('Missing ABI provider')
         }
-        return tx
+        const actions = await Promise.all(tx.actions.map(async (rawAction) => {
+            const contractAbi = await provider.getAbi(rawAction.account)
+            const contract = getContract(contractAbi)
+            // hook into eosjs name decoder and return the signing account if we encounter the placeholder
+            // this is fine because getContract re-creates the initial types each time
+            contract.types.get('name')!.deserialize = (buffer: Serialize.SerialBuffer) => {
+                const name = buffer.getName()
+                if (name === PlaceholderName) {
+                    return (signer as abi.PermissionLevel).actor
+                } else {
+                    return name
+                }
+            }
+            const action = this.deserializeAction(contract, rawAction)
+            action.authorization = action.authorization.map((val) => {
+                const auth = {...val}
+                if (auth.actor === PlaceholderName) {
+                    auth.actor = (signer as abi.PermissionLevel).actor
+                }
+                if (auth.permission === PlaceholderName) {
+                    auth.permission = (signer as abi.PermissionLevel).permission
+                }
+                return auth
+            })
+            return action
+        }))
+        return {...tx, actions}
     }
 
     /**
@@ -432,8 +510,10 @@ export class SigningRequest {
         if (!provider) {
             throw new Error('Missing ABI provider')
         }
-        const actions = this.getRawActions().map((action) => {
-            return this.deserializeAction(action, provider)
+        const actions = this.getRawActions().map(async (action) => {
+            const contractAbi = await provider.getAbi(action.account)
+            const contract = getContract(contractAbi)
+            return this.deserializeAction(contract, action)
         })
         return Promise.all(actions)
     }
@@ -457,10 +537,8 @@ export class SigningRequest {
     public toString() { return this.encode() }
     public toJSON() { return this.encode() }
 
-    /** Helper that resolves the contract abi and deserializes the action. */
-    private async deserializeAction(action: abi.Action, provider: AbiProvider) {
-        const contractAbi = await provider.getAbi(action.account)
-        const contract = getContract(contractAbi)
+    /** Helper that decodes the action data using provided contract. */
+    private deserializeAction(contract: Serialize.Contract, action: abi.Action) {
         return Serialize.deserializeAction(
             contract,
             action.account, action.name, action.authorization, action.data as any,
