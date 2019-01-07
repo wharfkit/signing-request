@@ -2,7 +2,7 @@
  * EOSIO URI Signing Request.
  */
 
-import {Serialize} from 'eosjs'
+import { Serialize } from 'eosjs'
 
 import * as abi from './abi'
 import * as base64u from './base64u'
@@ -57,7 +57,7 @@ export interface ResolvedCallback {
      * The resolved context, for a https POST this should be included in
      * the request body as JSON.
      */
-    ctx: {[key: string]: string}
+    ctx: { [key: string]: string }
 }
 
 /**
@@ -82,9 +82,6 @@ export interface TransactionContext {
     expiration?: string
 }
 
-/** A 32-byte hex-encoded string representing a chain id. */
-export type ChainId = string
-
 /** Chain ID aliases. */
 export enum ChainName {
     UNKNOWN = 0,
@@ -92,7 +89,7 @@ export enum ChainName {
     TELOS = 2,
 }
 
-const ChainIdLookup = new Map<ChainName, ChainId>([
+const ChainIdLookup = new Map<abi.ChainAlias, abi.ChainId>([
     [ChainName.EOS, 'aca376f206b8fc25a6ed44dbdc66547c36c6c33e3a119ffbeaef943642f0e906'],
     [ChainName.TELOS, '4667b205c6838ef70ff7988f6e8257e8be0e1284a2f59699054a018f743b1d11'],
 ])
@@ -137,16 +134,16 @@ export interface SigningRequestCreateArguments {
      * Full or partial transaction to create request with.
      * If TAPoS info is omitted it will be filled in when resolving the request.
      */
-    transaction?: {actions: abi.Action[], [key: string]: any}
+    transaction?: { actions: abi.Action[], [key: string]: any }
     /** Chain to use, defaults to EOS main-net if omitted. */
-    chainId?: ChainId | ChainName
+    chainId?: abi.ChainAlias | abi.ChainAlias
     /** Whether wallet should broadcast tx, defaults to true. */
     broadcast?: boolean
     /**
      * Optional callback URL the signer should hit after
      * broadcasting or signing. Passing a string means background = false.
      */
-    callback?: string | {url: string, background: boolean}
+    callback?: string | { url: string, background: boolean }
 }
 
 export interface SigningRequestEncodingOptions {
@@ -211,17 +208,17 @@ export class SigningRequest {
 
         // set the chain id
         if (!args.chainId || typeof args.chainId === 'number') {
-            data.chain_id = ['uint8', args.chainId || ChainName.EOS]
+            data.chain_id = ['chain_alias', args.chainId || ChainName.EOS]
         } else {
             // resolve known chain id's to their aliases
             for (const [n, id] of ChainIdLookup) {
                 if (id === args.chainId) {
-                    data.chain_id = ['uint8', n]
+                    data.chain_id = ['chain_alias', n]
                     break
                 }
             }
             if (!data.chain_id) {
-                data.chain_id = ['checksum256', args.chainId]
+                data.chain_id = ['chain_id', args.chainId]
             }
         }
 
@@ -229,7 +226,7 @@ export class SigningRequest {
         data.broadcast = args.broadcast !== undefined ? args.broadcast : true
         if (args.callback) {
             if (typeof args.callback === 'string') {
-                data.callback = {url: args.callback, background: false}
+                data.callback = { url: args.callback, background: false }
             } else {
                 data.callback = args.callback
             }
@@ -250,6 +247,7 @@ export class SigningRequest {
         }
         const data = base64u.decode(encoded)
         const header = data[0]
+        console.log("header", header)
         const version = header & ~(1 << 7)
         if (version !== 1) {
             throw new Error('Invalid protocol version')
@@ -358,7 +356,7 @@ export class SigningRequest {
     ) {
         if (typeof signer === 'string') {
             const [actor, permission] = signer.split('@')
-            signer = {actor, permission}
+            signer = { actor, permission }
         }
         if (
             typeof signer !== 'object' ||
@@ -431,7 +429,7 @@ export class SigningRequest {
             }
             const action = this.deserializeAction(contract, rawAction)
             action.authorization = action.authorization.map((val) => {
-                const auth = {...val}
+                const auth = { ...val }
                 if (auth.actor === PlaceholderName) {
                     auth.actor = (signer as abi.PermissionLevel).actor
                 }
@@ -442,7 +440,7 @@ export class SigningRequest {
             })
             return action
         }))
-        return {...tx, actions}
+        return { ...tx, actions }
     }
 
     /**
@@ -463,11 +461,11 @@ export class SigningRequest {
         if (!signatures || signatures.length === 0) {
             throw new Error('Must have at least one signature to resolve callback')
         }
-        const ctx: {[key: string]: string} = {
+        const ctx: { [key: string]: string } = {
             sig: signatures[0],
         }
         for (const [n, sig] of signatures.entries()) {
-            ctx[`sig${ n }`] = sig
+            ctx[`sig${n}`] = sig
         }
         if (context) {
             ctx.tx = context.transaction_id
@@ -488,14 +486,14 @@ export class SigningRequest {
      * Get the id of the chain where this request is valid.
      * @returns The 32-byte chain id as hex encoded string.
      */
-    public getChainId() {
+    public getChainId(): abi.ChainId {
         const id = this.data.chain_id
         switch (id[0]) {
-            case 'checksum256':
+            case 'chain_id':
                 return id[1]
-            case 'uint8':
+            case 'chain_alias':
                 if (ChainIdLookup.has(id[1])) {
-                    return ChainIdLookup.get(id[1])
+                    return ChainIdLookup.get(id[1])!
                 } else {
                     throw new Error('Unknown chain id alias')
                 }

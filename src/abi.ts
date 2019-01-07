@@ -3,7 +3,9 @@
 export type AccountName = string /*name*/
 export type ActionName = string /*name*/
 export type PermissionName = string /*name*/
-export type VariantId = ['uint8', number /*uint8*/] | ['checksum256', string /*checksum256*/]
+export type ChainAlias = number /*uint8*/
+export type ChainId = string /*checksum256*/
+export type VariantId = ['chain_alias', ChainAlias] | ['chain_id', ChainId]
 export type VariantReq = ['action', Action] | ['action[]', Action[]] | ['transaction', Transaction]
 
 export interface PermissionLevel {
@@ -15,7 +17,7 @@ export interface Action {
     account: AccountName
     name: ActionName
     authorization: PermissionLevel[]
-    data: string | {[key: string]: any}
+    data: string | { [key: string]: any }
 }
 
 export interface Extension {
@@ -64,6 +66,14 @@ export const data = {
         {
             new_type_name: 'permission_name',
             type: 'name',
+        },
+        {
+            new_type_name: 'chain_alias',
+            type: 'uint8',
+        },
+        {
+            new_type_name: 'chain_id',
+            type: 'checksum256',
         },
     ],
     structs: [
@@ -199,7 +209,7 @@ export const data = {
     variants: [
         {
             name: 'variant_id',
-            types: ['uint8', 'checksum256'],
+            types: ['chain_alias', 'chain_id'],
         },
         {
             name: 'variant_req',
