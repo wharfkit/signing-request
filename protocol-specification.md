@@ -40,10 +40,10 @@ Which when resolved using the `bar@active` permission and TAPoS values of
         "account": "eosio.token",
         "name": "transfer",
         "authorization": [{
-            "actor": "banani", "permission": "poonani"
+            "actor": "bar", "permission": "active"
           }],
         "data": {
-          "from": "banani",
+          "from": "bar",
           "to": "foo",
           "quantity": "42.0000 EOS",
           "memo": "share and enjoy!"
@@ -83,7 +83,7 @@ The signing request payload.
 
   param       | description
  -------------|-------------
-  `chain_id`  | 32-byte id of target chain or 1-byte alias (see [Chain Aliases](#chain-aliases))
+  `chain_id`  | 32-byte id of target chain or 1-byte alias (see [chain aliases](#chain-aliases))
   `req`       | the action, list of actions or full transaction that should be signed
   `broadcast` | whether the resulting transaction should be broadcast after signing
   `callback`  | the callback that should be hit after the transaction is broadcast or signed
@@ -297,8 +297,7 @@ Using compression is recommended since it generates much shorter URIs (and small
 
 Compressed: `eosio://gWNgZGBY1mTC_MoglIGBIVzX5uxZRqAQGMBoQxgDAjRiF2SwgVksrv7BIFqgOCOxKFUhMS9FITUvK79SkZEBAA`
 
-Uncompressed: `eosio://AQABAACmgjQD6jBVAAAAVy08zc0BAQAAAAAAAAABAAAAAAAAADEBAAAAAAAAAAAAAAAAAChdoGgGAAAAAAAERU9TAAAAABBzaGFyZSBhbmQgZW5qb3khAQA
-aca376f206b8fc25a6ed44dbdc66547c36c6c33e3a119ffbeaef943642f0e906`
+Uncompressed: `eosio://AQABAACmgjQD6jBVAAAAVy08zc0BAQAAAAAAAAABAAAAAAAAADEBAAAAAAAAAAAAAAAAAChdoGgGAAAAAAAERU9TAAAAABBzaGFyZSBhbmQgZW5qb3khAQA`
 
 ## Callbacks
 
