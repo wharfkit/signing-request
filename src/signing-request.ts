@@ -239,13 +239,13 @@ export class SigningRequest {
         )
     }
 
-    /** Creates a signing request from encoded eosio:// uri string. */
+    /** Creates a signing request from encoded `eosio:` uri string. */
     public static from(uri: string, options: SigningRequestEncodingOptions = {}) {
-        const [proto, encoded] = uri.split('//')
-        if (proto !== 'eosio:' && proto !== 'web+eosio:') {
-            throw new Error('Invalid protocol')
+        const [scheme, path] = uri.split(':')
+        if (scheme !== 'eosio' && proto !== 'web+eosio') {
+            throw new Error('Invalid scheme')
         }
-        const data = base64u.decode(encoded)
+        const data = base64u.decode(path)
         const header = data[0]
         console.log("header", header)
         const version = header & ~(1 << 7)
@@ -313,11 +313,11 @@ export class SigningRequest {
     }
 
     /**
-     * Encode this request into an eosio:// uri.
+     * Encode this request into an `eosio:` uri.
      * @argument compress Whether to compress the request data using zlib,
      *                    defaults to true if omitted and zlib is present;
      *                    otherwise false.
-     * @returns An eosio:// uri string.
+     * @returns An `eosio:` uri string.
      */
     public encode(compress?: boolean): string {
         const shouldCompress = compress !== undefined ? compress : this.zlib !== undefined
@@ -338,7 +338,7 @@ export class SigningRequest {
         const data = new Uint8Array(array.byteLength + 1)
         data[0] = header
         data.set(array, 1)
-        return 'eosio://' + base64u.encode(data)
+        return 'eosio:' + base64u.encode(data)
     }
 
     /**
