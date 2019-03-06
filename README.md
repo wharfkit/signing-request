@@ -28,7 +28,7 @@ URI protocol for facilitating signing of EOSIO transactions.
 **URI Generated**
 
 ```
-eosio://23NcfRWj7pN3ea4b58SDtkHKMnPNccjPcmPnRgK4psydL5gYLrVbAvpe2J5KbJTA9kVeqfTxPx29ykwJKZLo3o1phYrxwCqjUBotHGwFAiFUm7wyCNjV2TMVy
+eosio:23NcfRWj7pN3ea4b58SDtkHKMnPNccjPcmPnRgK4psydL5gYLrVbAvpe2J5KbJTA9kVeqfTxPx29ykwJKZLo3o1phYrxwCqjUBotHGwFAiFUm7wyCNjV2TMVy
 ```
 
 ### Example Code
