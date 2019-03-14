@@ -242,7 +242,7 @@ export class SigningRequest {
     /** Creates a signing request from encoded `eosio:` uri string. */
     public static from(uri: string, options: SigningRequestEncodingOptions = {}) {
         const [scheme, path] = uri.split(':')
-        if (scheme !== 'eosio' && proto !== 'web+eosio') {
+        if (scheme !== 'eosio' && scheme !== 'web+eosio') {
             throw new Error('Invalid scheme')
         }
         const data = base64u.decode(path)
