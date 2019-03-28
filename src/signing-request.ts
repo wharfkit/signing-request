@@ -261,7 +261,6 @@ export class SigningRequest {
         }
         const data = base64u.decode(path)
         const header = data[0]
-        console.log("header", header)
         const version = header & ~(1 << 7)
         if (version !== 1) {
             throw new Error('Invalid protocol version')
