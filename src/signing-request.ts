@@ -292,7 +292,7 @@ export class SigningRequest {
      * bn = block number, present if broadcast
      * tx = transaction id string, present if broadcast
      */
-    private static CALLBACK_PATTERN = /({{(sig\d*|bi|bn|tx)}})/g
+    private static CALLBACK_PATTERN = /({{(sig\d*|bn|tx)}})/g
 
     /** The signing request version. */
     public version: number
@@ -482,7 +482,6 @@ export class SigningRequest {
         }
         if (context) {
             ctx.tx = context.transaction_id
-            ctx.bi = context.processed.id
             ctx.bn = String(context.processed.block_num)
         }
         const url = callback.url.replace(SigningRequest.CALLBACK_PATTERN, (_1, _2, m) => {
