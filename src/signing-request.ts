@@ -415,7 +415,9 @@ export class SigningRequest {
                 ctx.ref_block_prefix !== undefined &&
                 ctx.timestamp !== undefined
             ) {
-                const header = Serialize.transactionHeader(ctx as any, ctx.expire_seconds || 60)
+                const header = Serialize.transactionHeader(ctx as any,
+                    ctx.expire_seconds !== undefined ? ctx.expire_seconds : 60,
+                )
                 tx.expiration = header.expiration
                 tx.ref_block_num = header.ref_block_num
                 tx.ref_block_prefix = header.ref_block_prefix
