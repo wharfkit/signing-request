@@ -12,7 +12,7 @@
     "lib/*"
   ],
   "dependencies": {
-    "eosjs": "^20.0.0-beta3"
+    "eosjs": "^20.0.0"
   },
   "devDependencies": {
     "@types/mocha": "^5.2.7",
