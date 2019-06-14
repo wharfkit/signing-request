@@ -14,6 +14,10 @@ lib: $(SRC_FILES) node_modules tsconfig.json
 lint: node_modules
 	NODE_ENV=test tslint -p tsconfig.json -c tslint.json -t stylish --fix
 
+.PHONY: test
+test: node_modules
+	mocha --require ts-node/register test/*.ts --grep '$(grep)'
+
 node_modules:
 	yarn install --non-interactive --frozen-lockfile
 

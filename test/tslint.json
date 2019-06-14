@@ -1,0 +1,8 @@
+{
+  "defaultSeverity": "warning",
+  "extends": ["../tslint.json"],
+  "rules": {
+    "only-arrow-functions": false,
+    "no-console": false
+  }
+}
