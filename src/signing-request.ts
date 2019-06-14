@@ -162,9 +162,9 @@ export interface SigningRequestCreateArguments {
 
 export interface SigningRequestEncodingOptions {
     /** UTF-8 text encoder, required when using node.js. */
-    textEncoder?: TextEncoder
+    textEncoder?: any
     /** UTF-8 text decoder, required when using node.js. */
-    textDecoder?: TextDecoder
+    textDecoder?: any
     /** Optional zlib, if provided the request will be compressed when encoding. */
     zlib?: ZlibProvider
     /** Abi provider, required if the arguments contain un-encoded actions. */
