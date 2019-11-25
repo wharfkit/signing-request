@@ -12,7 +12,8 @@
     "lib/*"
   ],
   "dependencies": {
-    "eosjs": "^20.0.0"
+    "eosjs": "^20.0.0",
+    "fast-sha256": "^1.1.1"
   },
   "devDependencies": {
     "@types/mocha": "^5.2.7",

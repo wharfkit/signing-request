@@ -390,6 +390,11 @@ execa@^1.0.0:
     signal-exit "^3.0.0"
     strip-eof "^1.0.0"
 
+fast-sha256@^1.1.1:
+  version "1.1.1"
+  resolved "https://registry.yarnpkg.com/fast-sha256/-/fast-sha256-1.1.1.tgz#2a1fca6a7fd0943da478f17760d19cf52ba78dea"
+  integrity sha512-CKUjAtRhTHaLueE7eUPX4009H7yMZxxBWHYxvzCn3WySKza5+S5EknF86zpOzF4Is4/qNUzbrhtC19gUMzCUdQ==
+
 find-up@3.0.0, find-up@^3.0.0:
   version "3.0.0"
   resolved "https://registry.yarnpkg.com/find-up/-/find-up-3.0.0.tgz#49169f1d7993430646da61ecc5ae355c21c97b73"

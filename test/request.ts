@@ -1,7 +1,7 @@
 import * as assert from 'assert'
 import 'mocha'
 import {TextDecoder, TextEncoder} from 'util'
-import {SigningRequest, SigningRequestEncodingOptions} from '../src'
+import {SigningRequest, SigningRequestEncodingOptions, SignatureProvider} from '../src'
 import abiProvider from './utils/mock-abi-provider'
 import zlib from './utils/node-zlib-provider'
 
@@ -175,5 +175,64 @@ describe('signing request', function() {
             delay_sec: 0,
         })
     })
+
+    it('should encode and decode requests', async function() {
+        const req1 = await SigningRequest.create({
+            action: {
+                account: 'eosio.token',
+                name: 'transfer',
+                authorization: [{actor: 'foo', permission: 'active'}],
+                data: {from: 'foo', to: 'bar', quantity: '1.0000 EOS', memo: 'hello there'},
+            },
+        }, options)
+        const encoded = req1.encode()
+        assert.strictEqual(
+            encoded,
+            'eosio:gWNgZGBY1mTC_MoglIGBIVzX5uxZoAgIaMSCyBVvjYx0kAUYGNZZCqhDWCyu_sEgmjsjNScnX6EkI7UolZEBAA'
+        )
+        const req2 = SigningRequest.from(encoded, options)
+        assert.deepStrictEqual(req2.data, req1.data)
+
+    })
+
+    it('should create identity request', async function() {
+        let req = await SigningRequest.identity({callback: {
+            background: true,
+            url: 'https://example.com'
+        }}, options)
+        assert.strictEqual(
+            req.getIdentityDigest('foo'),
+            '73A89710D3EC00C050E6737A9AE832A0D086707C760517236BFAC6FEAF190C69'
+        )
+        assert(req.getIdentityDigest('foo') != req.getIdentityDigest('bar'))
+    })
+
+    it('should encode and decode signed requests', async function() {
+        const mockSig = {
+            signer: 'foo',
+            signature:
+                'SIG_K1_K8Wm5AXSQdKYVyYFPCYbMZurcJQXZaSgXoqXAKE6uxR6Jot7otVzS55JGRhixCwNGxaGezrVckDgh88xTsiu4wzzZuP9JE',
+        }
+        const signatureProvider: SignatureProvider = {
+            sign(message) {
+                return mockSig
+            }
+        }
+        let req = await SigningRequest.identity({callback: {
+            background: true,
+            url: 'https://example.com'
+        }}, {...options, signatureProvider} )
+        assert.deepStrictEqual(req.signature, mockSig)
+        let encoded = req.encode()
+        assert.strictEqual(
+            encoded,
+            'eosio:gWNgZGZkQAeMwhklJQXFVvr6qRWJuQU5qXrJ-blQZRqxDPKp4VlTVHdu11n78U_PvahrUseZrzF5ZUkstGV7XemuzCdReEpU2eDvNOlm9RqVs9HtQt3sx-OyDrAbePI_Zze533UFAA'
+        )
+        let req2 = SigningRequest.from(encoded, options)
+        assert.deepStrictEqual(req2.data, req.data)
+        assert.deepStrictEqual(req2.signature, mockSig)
+    })
+
+
 
 })

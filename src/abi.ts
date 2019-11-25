@@ -6,7 +6,8 @@ export type PermissionName = string /*name*/
 export type ChainAlias = number /*uint8*/
 export type ChainId = string /*checksum256*/
 export type VariantId = ['chain_alias', ChainAlias] | ['chain_id', ChainId]
-export type VariantReq = ['action', Action] | ['action[]', Action[]] | ['transaction', Transaction]
+export type VariantReq = ['action', Action] | ['action[]', Action[]] |
+    ['transaction', Transaction] | ['identity', Identity]
 
 export interface PermissionLevel {
     actor: AccountName
@@ -49,7 +50,18 @@ export interface SigningRequest {
     chain_id: VariantId
     req: VariantReq
     broadcast: boolean
-    callback: Callback | undefined
+    callback: Callback | undefined | null
+}
+
+export interface Identity {
+    account: AccountName
+    sender: AccountName
+    request_key: string | undefined | null /*public_key*/
+}
+
+export interface RequestSignature {
+    signer: AccountName
+    signature: string
 }
 
 export const data = {
@@ -205,6 +217,36 @@ export const data = {
                 },
             ],
         },
+        {
+            name: 'identity',
+            fields: [
+                {
+                    name: 'account',
+                    type: 'name',
+                },
+                {
+                    name: 'sender',
+                    type: 'name',
+                },
+                {
+                    name: 'request_key',
+                    type: 'public_key?',
+                },
+            ],
+        },
+        {
+            name: 'request_signature',
+            fields: [
+                {
+                    name: 'signer',
+                    type: 'name',
+                },
+                {
+                    name: 'signature',
+                    type: 'signature',
+                },
+            ],
+        },
     ],
     variants: [
         {
@@ -213,7 +255,7 @@ export const data = {
         },
         {
             name: 'variant_req',
-            types: ['action', 'action[]', 'transaction'],
+            types: ['action', 'action[]', 'transaction', 'identity'],
         },
     ],
 }

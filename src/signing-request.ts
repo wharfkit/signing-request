@@ -3,6 +3,7 @@
  */
 
 import { Serialize } from 'eosjs'
+import sha256 from 'fast-sha256'
 
 import * as abi from './abi'
 import * as base64u from './base64u'
@@ -24,6 +25,12 @@ export interface ZlibProvider {
     deflateRaw: (data: Uint8Array) => Uint8Array
     /** Inflate data w/o requiring zlib header. */
     inflateRaw: (data: Uint8Array) => Uint8Array
+}
+
+/** Interface that should be implemented by signature providers. */
+export interface SignatureProvider {
+    /** Sign 32-byte hex-encoded message and return signer name and signature string. */
+    sign: (message: string) => {signer: string, signature: string}
 }
 
 /**
@@ -139,6 +146,8 @@ const ChainIdLookup = new Map<abi.ChainAlias, abi.ChainId>([
  */
 export const PlaceholderName = '............1' // aka uint64(1)
 
+export type CallbackType = string | { url: string, background: boolean }
+
 export interface SigningRequestCreateArguments {
     /** Single action to create request with. */
     action?: abi.Action
@@ -149,15 +158,40 @@ export interface SigningRequestCreateArguments {
      * If TAPoS info is omitted it will be filled in when resolving the request.
      */
     transaction?: { actions: abi.Action[], [key: string]: any }
+    /** Create an identity request. */
+    identity?: abi.Identity
     /** Chain to use, defaults to EOS main-net if omitted. */
-    chainId?: abi.ChainAlias | abi.ChainAlias
+    chainId?: string | number
     /** Whether wallet should broadcast tx, defaults to true. */
     broadcast?: boolean
     /**
      * Optional callback URL the signer should hit after
      * broadcasting or signing. Passing a string means background = false.
      */
-    callback?: string | { url: string, background: boolean }
+    callback?: CallbackType
+}
+
+export interface SigningRequestCreateIdentityArguments {
+    /**
+     * Callback where the identity should be delivered.
+     */
+    callback: CallbackType
+    /** Chain to use, defaults to EOS if omitted. */
+    chainId?: string | number
+    /**
+     * Requested account name of identity.
+     * Defaults to placeholder (any identity) if omitted.
+     */
+    account?: string
+    /**
+     * Requester of identity.
+     * Defaults to null name (`.............`) if omitted.
+     */
+    sender?: string
+    /**
+     * Request key, can be used to verify subsequent requests.
+     */
+    request_key?: string
 }
 
 export interface SigningRequestEncodingOptions {
@@ -169,6 +203,8 @@ export interface SigningRequestEncodingOptions {
     zlib?: ZlibProvider
     /** Abi provider, required if the arguments contain un-encoded actions. */
     abiProvider?: AbiProvider
+    /** Optional signature provider, will be used to create a request signature if provided. */
+    signatureProvider?: SignatureProvider
 }
 
 export class SigningRequest {
@@ -198,7 +234,9 @@ export class SigningRequest {
         const data: any = {}
 
         // set the request data
-        if (args.action && !args.actions && !args.transaction) {
+        if (args.identity !== undefined) {
+            data.req = ['identity', args.identity]
+        } else if (args.action && !args.actions && !args.transaction) {
             data.req = ['action', await serializeAction(args.action)]
         } else if (args.actions && !args.action && !args.transaction) {
             data.req = ['action[]', await Promise.all(args.actions.map(serializeAction))]
@@ -221,36 +259,38 @@ export class SigningRequest {
         }
 
         // set the chain id
-        if (!args.chainId || typeof args.chainId === 'number') {
-            data.chain_id = ['chain_alias', args.chainId || ChainName.EOS]
-        } else {
-            // resolve known chain id's to their aliases
-            for (const [n, id] of ChainIdLookup) {
-                if (id === args.chainId) {
-                    data.chain_id = ['chain_alias', n]
-                    break
-                }
-            }
-            if (!data.chain_id) {
-                data.chain_id = ['chain_id', args.chainId]
-            }
-        }
+        data.chain_id = variantId(args.chainId)
 
         // set the request options
         data.broadcast = args.broadcast !== undefined ? args.broadcast : true
-        if (args.callback) {
-            if (typeof args.callback === 'string') {
-                data.callback = { url: args.callback, background: false }
-            } else {
-                data.callback = args.callback
-            }
-        } else {
-            data.callback = null
-        }
+        data.callback = callbackValue(args.callback)
 
-        return new SigningRequest(
+        const req = new SigningRequest(
             1, data, textEncoder, textDecoder, options.zlib, options.abiProvider,
         )
+
+        // sign the request if given a signature provider
+        if (options.signatureProvider) {
+            req.sign(options.signatureProvider)
+        }
+
+        return req
+    }
+
+    /** Creates an identity request. */
+    public static identity(
+        args: SigningRequestCreateIdentityArguments,
+        options: SigningRequestEncodingOptions = {},
+    ) {
+        return this.create({
+            identity: {
+                account: args.account || PlaceholderName,
+                sender: args.sender || '',
+                request_key: args.request_key || null,
+            },
+            broadcast: false,
+            callback: args.callback,
+        }, options)
     }
 
     /** Creates a signing request from encoded `eosio:` uri string. */
@@ -259,7 +299,7 @@ export class SigningRequest {
         if (scheme !== 'eosio' && scheme !== 'web+eosio') {
             throw new Error('Invalid scheme')
         }
-        const data = base64u.decode(path)
+        const data = base64u.decode(path.startsWith('//') ? path.slice(2) : path)
         const header = data[0]
         const version = header & ~(1 << 7)
         if (version !== 1) {
@@ -278,8 +318,13 @@ export class SigningRequest {
             textEncoder, textDecoder, array,
         })
         const req = SigningRequest.type.deserialize(buffer)
+        let signature: abi.RequestSignature | undefined
+        if (buffer.haveReadData()) {
+            const type = AbiTypes.get('request_signature')!
+            signature = type.deserialize(buffer)
+        }
         return new SigningRequest(
-            version, req, textEncoder, textDecoder, options.zlib, options.abiProvider,
+            version, req, textEncoder, textDecoder, options.zlib, options.abiProvider, signature,
         )
     }
 
@@ -291,14 +336,19 @@ export class SigningRequest {
      * bi = block id string, present if broadcast
      * bn = block number, present if broadcast
      * tx = transaction id string, present if broadcast
+     * id = the signing account
+     * idp = the signing account permission
      */
-    private static CALLBACK_PATTERN = /({{(sig\d*|bn|tx)}})/g
+    private static CALLBACK_PATTERN = /({{(sig\d*|bn|tx|id|idp)}})/g
 
     /** The signing request version. */
     public version: number
 
     /** The raw signing request data. */
     public data: abi.SigningRequest
+
+    /** The request signature. */
+    public signature?: abi.RequestSignature
 
     private textEncoder: TextEncoder
     private textDecoder: TextDecoder
@@ -316,6 +366,7 @@ export class SigningRequest {
         textDecoder: TextDecoder,
         zlib?: ZlibProvider,
         abiProvider?: AbiProvider,
+        signature?: abi.RequestSignature,
     ) {
         this.version = version
         this.data = data
@@ -323,6 +374,22 @@ export class SigningRequest {
         this.textDecoder = textDecoder
         this.zlib = zlib
         this.abiProvider = abiProvider
+        this.signature = signature
+    }
+
+    /**
+     * Sign the request, mutating.
+     * @param signatureProvider The signature provider that provides a signature for the signer.
+     */
+    public sign(signatureProvider: SignatureProvider) {
+        const buffer = new Serialize.SerialBuffer({
+            textEncoder: this.textEncoder,
+            textDecoder: this.textDecoder,
+        })
+        buffer.pushArray([0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74]) // utf8 "request"
+        buffer.pushArray(this.getData())
+        const message = sha256(buffer.asUint8Array())
+        this.signature = signatureProvider.sign(Serialize.arrayToHex(message))
     }
 
     /**
@@ -337,21 +404,44 @@ export class SigningRequest {
         if (shouldCompress && this.zlib === undefined) {
             throw new Error('Need zlib to compress')
         }
+        let header = this.version
+        const data = this.getData()
+        const sigData = this.getSignatureData()
+        let array = new Uint8Array(data.byteLength + sigData.byteLength)
+        array.set(data, 0)
+        array.set(sigData, data.byteLength)
+        if (shouldCompress) {
+            header |= 1 << 7
+            array = this.zlib!.deflateRaw(array)
+        }
+        const out = new Uint8Array(1 + array.byteLength)
+        out[0] = header
+        out.set(array, 1)
+        return 'eosio:' + base64u.encode(out)
+    }
+
+    /** Get the request data without header or signature. */
+    public getData(): Uint8Array {
         const buffer = new Serialize.SerialBuffer({
             textEncoder: this.textEncoder,
             textDecoder: this.textDecoder,
         })
         SigningRequest.type.serialize(buffer, this.data)
-        let header = this.version
-        let array = buffer.asUint8Array()
-        if (shouldCompress) {
-            header |= 1 << 7
-            array = this.zlib!.deflateRaw(array)
+        return buffer.asUint8Array()
+    }
+
+    /** Get signature data, returns an empty array if request is not signed. */
+    public getSignatureData(): Uint8Array {
+        if (!this.signature) {
+            return new Uint8Array(0)
         }
-        const data = new Uint8Array(array.byteLength + 1)
-        data[0] = header
-        data.set(array, 1)
-        return 'eosio:' + base64u.encode(data)
+        const buffer = new Serialize.SerialBuffer({
+            textEncoder: this.textEncoder,
+            textDecoder: this.textDecoder,
+        })
+        const type = AbiTypes.get('request_signature')!
+        type.serialize(buffer, this.signature)
+        return buffer.asUint8Array()
     }
 
     /**
@@ -367,17 +457,7 @@ export class SigningRequest {
         ctx: TransactionContext,
         abiProvider?: AbiProvider,
     ) {
-        if (typeof signer === 'string') {
-            const [actor, permission] = signer.split('@')
-            signer = { actor, permission }
-        }
-        if (
-            typeof signer !== 'object' ||
-            typeof signer.actor !== 'string' ||
-            typeof signer.permission !== 'string'
-        ) {
-            throw new TypeError('Invalid signer')
-        }
+        signer = parseSigner(signer)
         const req = this.data.req
         let tx: abi.Transaction
         switch (req[0]) {
@@ -398,6 +478,8 @@ export class SigningRequest {
             case 'transaction':
                 tx = req[1]
                 break
+            case 'identity':
+                throw new Error('Unable to generate transaction for identity request')
             default:
                 throw new Error('Invalid signing request data')
         }
@@ -459,16 +541,52 @@ export class SigningRequest {
     }
 
     /**
+     * Get 32-byte message that should be signed as response to an identity request.
+     * @param signer The account that will sign the identity request.
+     * @throws If the request isn't an identity request.
+     */
+    public getIdentityDigest(signer: string) {
+        if (this.data.req[0] !== 'identity') {
+            throw new Error('Not an identity request')
+        }
+        let { account, sender, request_key } = this.data.req[1] // tslint:disable-line:prefer-const
+        if (account === PlaceholderName) {
+            account = signer
+        }
+        // digest is sha256("identity" + chain_id + identity_req)
+        const buf = new Serialize.SerialBuffer({
+            textEncoder: this.textEncoder,
+            textDecoder: this.textDecoder,
+        })
+        buf.pushArray([0x69, 0x64, 0x65, 0x6e, 0x74, 0x69, 0x74, 0x79]) // utf8 "identity"
+        buf.pushArray(Serialize.hexToUint8Array(this.getChainId()))
+        const type = AbiTypes.get('identity')!
+        type.serialize(buf, {account, sender, request_key})
+
+        return Serialize.arrayToHex(sha256(buf.asUint8Array()))
+    }
+
+    /**
      * Resolve callback.
      * @argument signatures The signature(s) of the resolved transaction.
      * @argument context The result of the push_transaction call if transaction was broadcast.
+     * @argument signer The auth the first signature was created with, only required for identity requests.
      * @returns An object containing the resolved URL and context or null if no callback is present.
      */
-    public getCallback(signatures: string | string[], context?: CallbackContext): ResolvedCallback | null {
+    public getCallback(
+        signatures: string | string[],
+        context?: CallbackContext,
+        signer?: string | abi.PermissionLevel,
+    ): ResolvedCallback | null {
         const callback = this.data.callback
-        if (!callback) { return null }
+        if (!callback) {
+            return null
+        }
         if (this.data.broadcast && !context) {
             throw new Error('Must provide callback context for broadcast request')
+        }
+        if (this.data.req[0] === 'identity' && !signer) {
+            throw new Error('Must provide signer for identity request')
         }
         if (typeof signatures === 'string') {
             signatures = [signatures]
@@ -485,6 +603,11 @@ export class SigningRequest {
         if (context) {
             ctx.tx = context.transaction_id
             ctx.bn = String(context.processed.block_num)
+        }
+        if (signer) {
+            signer = parseSigner(signer)
+            ctx.id = signer.actor
+            ctx.idp = signer.permission
         }
         const url = callback.url.replace(SigningRequest.CALLBACK_PATTERN, (_1, _2, m) => {
             return ctx[m] || ''
@@ -540,21 +663,35 @@ export class SigningRequest {
                 return req[1]
             case 'transaction':
                 return req[1].actions
+            case 'identity':
+                return []
             default:
                 throw new Error('Invalid signing request data')
         }
     }
 
+    public isIdentityRequest(): boolean {
+        return this.data.req[0] === 'identity'
+    }
+
     // Convenience methods.
-    public toString() { return this.encode() }
-    public toJSON() { return this.encode() }
+    public toString() {
+        return this.encode()
+    }
+    public toJSON() {
+        return this.encode()
+    }
 
     /** Helper that decodes the action data using provided contract. */
     private deserializeAction(contract: Serialize.Contract, action: abi.Action) {
         return Serialize.deserializeAction(
             contract,
-            action.account, action.name, action.authorization, action.data as any,
-            this.textEncoder, this.textDecoder,
+            action.account,
+            action.name,
+            action.authorization,
+            action.data as any,
+            this.textEncoder,
+            this.textDecoder,
         )
     }
 }
@@ -567,4 +704,46 @@ function getContract(contractAbi: any): Serialize.Contract {
         actions.set(name, Serialize.getType(types, type))
     }
     return { types, actions }
+}
+
+function parseSigner(signer: string | abi.PermissionLevel): abi.PermissionLevel {
+    if (typeof signer === 'string') {
+        const [actor, permission] = signer.split('@')
+        signer = { actor, permission }
+    }
+    if (
+        typeof signer !== 'object' ||
+        typeof signer.actor !== 'string' ||
+        typeof signer.permission !== 'string'
+    ) {
+        throw new TypeError('Invalid signer')
+    }
+    return signer
+}
+
+function callbackValue(callback?: CallbackType): abi.Callback | null {
+    if (typeof callback === 'string') {
+        return { background: false, url: callback }
+    } else if (typeof callback === 'object') {
+        return callback
+    }
+    return null
+}
+
+function variantId(chainId?: abi.ChainId | abi.ChainAlias): abi.VariantId {
+    if (!chainId) {
+        chainId = ChainName.EOS
+    }
+    if (typeof chainId === 'number') {
+        return ['chain_alias', chainId]
+    } else {
+        // resolve known chain id's to their aliases
+        chainId = chainId.toLowerCase()
+        for (const [n, id] of ChainIdLookup) {
+            if (id === chainId) {
+                return ['chain_alias', n]
+            }
+        }
+        return ['chain_id', chainId]
+    }
 }
