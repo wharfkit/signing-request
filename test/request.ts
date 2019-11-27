@@ -195,16 +195,32 @@ describe('signing request', function() {
 
     })
 
-    it('should create identity request', async function() {
+    it('should create identity tx', async function() {
         let req = await SigningRequest.identity({callback: {
             background: true,
             url: 'https://example.com'
         }}, options)
-        assert.strictEqual(
-            req.getIdentityDigest('foo'),
-            '73A89710D3EC00C050E6737A9AE832A0D086707C760517236BFAC6FEAF190C69'
-        )
-        assert(req.getIdentityDigest('foo') != req.getIdentityDigest('bar'))
+        let tx = await req.getTransaction('foo@bar')
+        assert.deepStrictEqual(tx, {
+            actions: [
+                {
+                    account: '',
+                    name: 'identity',
+                    authorization: [],
+                    data: '000000000000285D00',
+                },
+            ],
+            context_free_actions: [],
+            transaction_extensions: [],
+            expiration: '1970-01-01T00:00:00.000',
+            ref_block_num: 0,
+            ref_block_prefix: 0,
+            max_cpu_usage_ms: 0,
+            max_net_usage_words: 0,
+            delay_sec: 0,
+        })
+        let tx2 = await req.getTransaction('other@active')
+        assert.notStrictEqual(tx2.actions[0].data, tx.actions[0].data)
     })
 
     it('should encode and decode signed requests', async function() {
@@ -218,21 +234,48 @@ describe('signing request', function() {
                 return mockSig
             }
         }
-        let req = await SigningRequest.identity({callback: {
-            background: true,
-            url: 'https://example.com'
-        }}, {...options, signatureProvider} )
-        assert.deepStrictEqual(req.signature, mockSig)
-        let encoded = req.encode()
+        const req1 = await SigningRequest.create(
+            {
+                action: {
+                    account: 'eosio.token',
+                    name: 'transfer',
+                    authorization: [{actor: 'foo', permission: 'active'}],
+                    data: {from: 'foo', to: 'bar', quantity: '1.000 EOS', memo: 'hello there'},
+                },
+            },
+            {...options, signatureProvider}
+        )
+        assert.deepStrictEqual(req1.signature, mockSig)
+        let encoded = req1.encode()
         assert.strictEqual(
             encoded,
-            'eosio:gWNgZGZkQAeMwhklJQXFVvr6qRWJuQU5qXrJ-blQZRqxDPKp4VlTVHdu11n78U_PvahrUseZrzF5ZUkstGV7XemuzCdReEpU2eDvNOlm9RqVs9HtQt3sx-OyDrAbePI_Zze533UFAA'
+            'eosio:gWNgZGBY1mTC_MoglIGBIVzX5uxZoAgIaMSCyBVvjYx0kAUYGNZZvmCGsJhd_YNBNHdGak5OvkJJRmpRKlQ3SLV8anjWFNWd23XWfvzTcy_qmtRx5mtMXlkSC23ZXle6K_NJFJ4SVTb4O026Wb1G5Wx0u1A3-_G4rAPsBp78z9lN7nddAQA'
         )
         let req2 = SigningRequest.from(encoded, options)
-        assert.deepStrictEqual(req2.data, req.data)
+        assert.deepStrictEqual(req2.data, req1.data)
         assert.deepStrictEqual(req2.signature, mockSig)
     })
 
+    it('should encode and decode test requests', async function() {
+        let req1uri = 'eosio:gWNgZGBY1mTC_MoglIGBIVzX5uxZoAgIaMSCyBVvjYx0kAUYGNZZvmCGsJhd_YNBNHdGak5OvkJJRmpRKiMDAA'
+        let req2uri = 'eosio:gWNgZGBY1mTC_MoglIGBIVzX5uxZoAgIaMSCyBVvjYx0kAUYGNZZvmCGsJhd_YNBNHdGak5OvkJJRmpRKkR3TDFQtYKjRZLW-rkn5z86tuzPxn7zSXZ7lkyOdFE_-tTE8_bqS4ab6vnUd_LqHG3ZVHCmNnW9qt6zEx9amy_k_FC6nqX1Uf7TdgA'
+        let req1 = SigningRequest.from(req1uri, options)
+        let req2 = SigningRequest.from(req2uri, options)
+        assert.deepStrictEqual(req1.getActions(), req2.getActions())
+        assert.strictEqual(req1.signature, undefined)
+        assert.deepStrictEqual(req2.signature, {
+            signer: "foobar",
+            signature: "SIG_K1_KdHDFseJF6paedvSbfHFZzhbtBDVAM8LxeDJsrG33sENRbUQMFHX8CvtT9wRLo4fE4QGYtbp1rF6BqNQ6Pv5XgSocXwM67"
+        })
+        assert.strictEqual(req1.encode(), req1uri)
+        assert.strictEqual(req2.encode(), req2uri)
+        let req3uri = "eosio:gWNgZGZkgABGBqYI7x9Sxl36f-rbJt9s2lUzbYe3pdtE7WnPfxy7_pAph3k5A6NKTmZetpW-fnKGXmJeckZ-kR5IQN_QyNhE18TUzFzXwtLAgBEA"
+        let req3 = SigningRequest.from(req3uri, options)
+        assert.strictEqual(req3.isIdentity(), true)
+        assert.strictEqual(req3.getIdentity(), null)
+        assert.strictEqual(req3.getIdentityKey(), "PUB_K1_5ZNmwoFDBPVnL2CYgZRpHqFfaK2M9bCFJJ1SapR9X4KPRdJ9eK")
+        assert.strictEqual(req3.encode(), req3uri)
+    })
 
 
 })

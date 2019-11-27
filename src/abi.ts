@@ -55,7 +55,6 @@ export interface SigningRequest {
 
 export interface Identity {
     account: AccountName
-    sender: AccountName
     request_key: string | undefined | null /*public_key*/
 }
 
@@ -225,10 +224,6 @@ export const data = {
                     type: 'name',
                 },
                 {
-                    name: 'sender',
-                    type: 'name',
-                },
-                {
                     name: 'request_key',
                     type: 'public_key?',
                 },
@@ -256,6 +251,12 @@ export const data = {
         {
             name: 'variant_req',
             types: ['action', 'action[]', 'transaction', 'identity'],
+        },
+    ],
+    actions: [
+        {
+            name: 'identity',
+            type: 'identity',
         },
     ],
 }
