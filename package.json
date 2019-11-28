@@ -1,5 +1,5 @@
 {
-  "name": "eosio-uri",
+  "name": "eosio-signing-request",
   "version": "0.0.5",
   "description": "`eosio:` uri encoder and decoder",
   "license": "MIT",
