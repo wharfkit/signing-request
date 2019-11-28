@@ -6,7 +6,7 @@
   "main": "./lib/index",
   "typings": "./lib/index",
   "scripts": {
-    "prepack": "make lib"
+    "prepare": "make lib"
   },
   "files": [
     "lib/*"
