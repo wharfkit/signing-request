@@ -6,8 +6,11 @@ export type PermissionName = string /*name*/
 export type ChainAlias = number /*uint8*/
 export type ChainId = string /*checksum256*/
 export type VariantId = ['chain_alias', ChainAlias] | ['chain_id', ChainId]
-export type VariantReq = ['action', Action] | ['action[]', Action[]] |
-    ['transaction', Transaction] | ['identity', Identity]
+export type VariantReq =
+    | ['action', Action]
+    | ['action[]', Action[]]
+    | ['transaction', Transaction]
+    | ['identity', Identity]
 
 export interface PermissionLevel {
     actor: AccountName
@@ -18,7 +21,7 @@ export interface Action {
     account: AccountName
     name: ActionName
     authorization: PermissionLevel[]
-    data: string | { [key: string]: any }
+    data: string | {[key: string]: any}
 }
 
 export interface Extension {
