@@ -354,6 +354,12 @@ export class SigningRequest {
         abiProvider?: AbiProvider,
         signature?: abi.RequestSignature,
     ) {
+        if (data.broadcast === true && data.req[0] === 'identity') {
+            throw new Error('Invalid request (identity request cannot be broadcast)')
+        }
+        if (data.broadcast === false && data.broadcast == null) {
+            throw new Error('Invalid request (nothing to do, no broadcast or callback set)')
+        }
         this.version = version
         this.data = data
         this.textEncoder = textEncoder
