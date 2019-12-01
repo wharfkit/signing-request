@@ -3,6 +3,7 @@ import 'mocha'
 import {TextDecoder, TextEncoder} from 'util'
 import {SignatureProvider, SigningRequest, SigningRequestEncodingOptions} from '../src'
 import abiProvider from './utils/mock-abi-provider'
+import mockAbiProvider from './utils/mock-abi-provider'
 import zlib from './utils/node-zlib-provider'
 
 const options: SigningRequestEncodingOptions = {
@@ -151,12 +152,17 @@ describe('signing request', function() {
             },
             options
         )
-        const tx = await request.getTransaction('foo@active', {
-            timestamp,
-            block_num: 1234,
-            expire_seconds: 0,
-            ref_block_prefix: 56789,
-        })
+        const abis = await request.fetchAbis()
+        const tx = await request.resolveTransaction(
+            abis,
+            {actor: 'foo', permission: 'bar'},
+            {
+                timestamp,
+                block_num: 1234,
+                expire_seconds: 0,
+                ref_block_prefix: 56789,
+            }
+        )
         assert.deepStrictEqual(tx, {
             actions: [
                 {
@@ -194,12 +200,17 @@ describe('signing request', function() {
             },
             options
         )
-        const tx = await request.getTransaction('foo@active', {
-            timestamp,
-            block_num: 1234,
-            expire_seconds: 0,
-            ref_block_prefix: 56789,
-        })
+        const abis = await request.fetchAbis()
+        const tx = await request.resolveTransaction(
+            abis,
+            {actor: 'foo', permission: 'active'},
+            {
+                timestamp,
+                block_num: 1234,
+                expire_seconds: 0,
+                ref_block_prefix: 56789,
+            }
+        )
         assert.deepStrictEqual(tx, {
             actions: [
                 {
@@ -252,7 +263,10 @@ describe('signing request', function() {
             },
             options
         )
-        let tx = await req.getTransaction('foo@bar')
+        let tx = req.resolveTransaction(mockAbiProvider.abis, {
+            actor: 'foo',
+            permission: 'bar',
+        })
         assert.deepStrictEqual(tx, {
             actions: [
                 {
@@ -274,7 +288,10 @@ describe('signing request', function() {
             max_net_usage_words: 0,
             delay_sec: 0,
         })
-        let tx2 = await req.getTransaction('other@active')
+        let tx2 = req.resolveTransaction(mockAbiProvider.abis, {
+            actor: 'other',
+            permission: 'active',
+        })
         assert.notStrictEqual(tx2.actions[0].data, tx.actions[0].data)
     })
 
@@ -318,7 +335,10 @@ describe('signing request', function() {
             'eosio:gWNgZGBY1mTC_MoglIGBIVzX5uxZoAgIaMSCyBVvjYx0kAUYGNZZvmCGsJhd_YNBNHdGak5OvkJJRmpRKkR3TDFQtYKjRZLW-rkn5z86tuzPxn7zSXZ7lkyOdFE_-tTE8_bqS4ab6vnUd_LqHG3ZVHCmNnW9qt6zEx9amy_k_FC6nqX1Uf7TdgA'
         let req1 = SigningRequest.from(req1uri, options)
         let req2 = SigningRequest.from(req2uri, options)
-        assert.deepStrictEqual(req1.getActions(), req2.getActions())
+        assert.deepStrictEqual(
+            req1.resolveActions(mockAbiProvider.abis),
+            req2.resolveActions(mockAbiProvider.abis)
+        )
         assert.strictEqual(req1.signature, undefined)
         assert.deepStrictEqual(req2.signature, {
             signer: 'foobar',

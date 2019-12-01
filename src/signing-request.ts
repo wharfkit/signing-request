@@ -34,18 +34,29 @@ export interface SignatureProvider {
 }
 
 /**
- * Context used to resolve a callback.
- * Compatible with the JSON response from a `push_transaction` call.
+ * The callback payload sent to background callbacks.
  */
-export interface CallbackContext {
-    /** The resulting transaction id. */
-    transaction_id: string // 32-byte hex-encoded checksum
-    processed: {
-        /** The block id where transaction was included. */
-        id: string // 32-byte hex-encoded checksum
-        /** The block number where transaction was included. */
-        block_num: number
-    }
+export interface CallbackPayload {
+    /** The first signature. */
+    sig: string
+    /** Transaction ID as HEX-encoded string. */
+    tx: string
+    /** Block number hint (only present if transaction was broadcast). */
+    bn?: string
+    /** Signer authority, aka account name. */
+    sa: string
+    /** Signer permission, e.g. "active". */
+    sp: string
+    /** Reference block num used when resolving request. */
+    rbn: string
+    /** Reference block id used when resolving request. */
+    rid: string
+    /** The originating signing request packed as a uri string. */
+    req: string
+    /** Expiration time used when resolving request. */
+    ex: string
+    /** All signatures 0-indexed as `sig0`, `sig1`, etc. */
+    [sig0: string]: string | undefined
 }
 
 /**
@@ -61,10 +72,10 @@ export interface ResolvedCallback {
      */
     background: boolean
     /**
-     * The resolved context, for a https POST this should be included in
-     * the request body as JSON.
+     * The callback payload as a object that should be encoded to JSON
+     * and POSTed to background callbacks.
      */
-    ctx: {[key: string]: string}
+    payload: CallbackPayload
 }
 
 /**
@@ -212,9 +223,12 @@ export interface SigningRequestEncodingOptions {
     signatureProvider?: SignatureProvider
 }
 
+export type AbiMap = Map<string, any>
+
 export class SigningRequest {
     public static type = AbiTypes.get('signing_request')!
     public static idType = AbiTypes.get('identity')!
+    public static transactionType = AbiTypes.get('transaction')!
 
     /** Create a new signing request. */
     public static async create(
@@ -357,19 +371,6 @@ export class SigningRequest {
         )
     }
 
-    /**
-     * Pattern used to resolve callback URLs.
-     * sig(N) = signature string, always present
-     *          where N signifies the signature 0-index if there are multiple
-     *          omitting the N is equivalent to sig0
-     * bi = block id string, present if broadcast
-     * bn = block number, present if broadcast
-     * tx = transaction id string, present if broadcast
-     * sa = the signing actor, aka account name
-     * sp = the signing permission
-     */
-    private static CALLBACK_PATTERN = /({{(sig\d*|bn|bi|tx|sa|sp)}})/g
-
     /** The signing request version. */
     public version: number
 
@@ -490,8 +491,14 @@ export class SigningRequest {
         ]
     }
 
+    /** Whether TaPoS values are required to resolve request. */
+    public requiresTapos() {
+        let tx = this.getRawTransaction()
+        return !this.isIdentity() && !hasTapos(tx)
+    }
+
     /** Resolve required ABI definitions. */
-    public async resolveAbis(abiProvider?: AbiProvider): Promise<Map<string, any>> {
+    public async fetchAbis(abiProvider?: AbiProvider): Promise<AbiMap> {
         const provider = abiProvider || this.abiProvider
         if (!provider) {
             throw new Error('Missing ABI provider')
@@ -510,7 +517,7 @@ export class SigningRequest {
      * @param abis ABI defenitions required to decode all actions.
      * @param signer Placeholders in actions will be resolved to signer if set.
      */
-    public decodeActions(abis: Map<string, any>, signer?: abi.PermissionLevel): abi.Action[] {
+    public resolveActions(abis: AbiMap, signer?: abi.PermissionLevel): abi.Action[] {
         return this.getRawActions().map((rawAction) => {
             let contractAbi: any | undefined
             if (isIdentity(rawAction)) {
@@ -559,27 +566,13 @@ export class SigningRequest {
         })
     }
 
-    /**
-     * Resolve request into a transaction that can be signed.
-     * @param signer The auth that will sign the transaction, in the format
-     *               `account@level` or {actor: 'account', permission: 'level'}.
-     * @param ctx The TAPoS values to use when resolving the transaction.
-     * @param abiProvider The abi provider to use to decode action data,
-     *                    will use the instance abiProvider if unset.
-     */
-    public async getTransaction(
-        signer: string | abi.PermissionLevel,
-        ctx: TransactionContext = {},
-        abiProvider?: AbiProvider
-    ) {
-        signer = parseSigner(signer)
+    public resolveTransaction(
+        abis: AbiMap,
+        signer: abi.PermissionLevel,
+        ctx: TransactionContext = {}
+    ): abi.Transaction {
         let tx = this.getRawTransaction()
-        if (
-            !this.isIdentity() &&
-            tx.expiration === '1970-01-01T00:00:00.000' &&
-            tx.ref_block_num === 0 &&
-            tx.ref_block_prefix === 0
-        ) {
+        if (!this.isIdentity() && !hasTapos(tx)) {
             if (
                 ctx.expiration !== undefined &&
                 ctx.ref_block_num !== undefined &&
@@ -606,66 +599,44 @@ export class SigningRequest {
                 )
             }
         }
-        const abis = await this.resolveAbis(abiProvider)
-        const actions = this.decodeActions(abis, signer)
+        const actions = this.resolveActions(abis, signer)
         return {...tx, actions}
     }
 
-    /**
-     * Resolve callback.
-     * @argument signatures The signature(s) of the resolved transaction.
-     * @argument context The result of the push_transaction call if transaction was broadcast.
-     * @argument signer The auth the first signature was created with.
-     * @returns An object containing the resolved URL and context or null if no callback is present.
-     */
-    public getCallback(
-        signatures: string | string[],
-        context?: CallbackContext,
-        signer?: string | abi.PermissionLevel
-    ): ResolvedCallback | null {
-        const callback = this.data.callback
-        if (!callback) {
-            return null
-        }
-        if (this.data.broadcast && this.data.req[0] === 'identity') {
-            throw new Error('Invalid identity request')
-        }
-        if (this.data.broadcast && !context) {
-            throw new Error('Must provide callback context for broadcast request')
-        }
-        if (this.data.req[0] === 'identity' && !signer) {
-            throw new Error('Must provide signer for identity request')
-        }
-        if (typeof signatures === 'string') {
-            signatures = [signatures]
-        }
-        if (!signatures || signatures.length === 0) {
-            throw new Error('Must have at least one signature to resolve callback')
-        }
-        const ctx: {[key: string]: string} = {
-            sig: signatures[0],
-        }
-        for (const [n, sig] of signatures.entries()) {
-            ctx[`sig${n}`] = sig
-        }
-        if (context) {
-            ctx.tx = context.transaction_id
-            ctx.bi = context.processed.id
-            ctx.bn = String(context.processed.block_num)
-        }
-        if (signer) {
-            signer = parseSigner(signer)
-            ctx.sa = signer.actor
-            ctx.sp = signer.permission
-        }
-        const url = callback.url.replace(SigningRequest.CALLBACK_PATTERN, (_1, _2, m) => {
-            return ctx[m] || ''
+    public resolve(abis: AbiMap, signer: abi.PermissionLevel, ctx: TransactionContext = {}) {
+        const transaction = this.resolveTransaction(abis, signer, ctx)
+        const buf = new Serialize.SerialBuffer({
+            textDecoder: this.textDecoder,
+            textEncoder: this.textEncoder,
         })
-        return {
-            background: callback.background,
-            ctx,
-            url,
-        }
+        const actions = transaction.actions.map((action) => {
+            let contractAbi: any
+            if (isIdentity(action)) {
+                contractAbi = abi.data
+            } else {
+                contractAbi = abis.get(action.account)
+            }
+            if (!contractAbi) {
+                throw new Error(`Missing ABI definition for ${action.account}`)
+            }
+            const contract = getContract(contractAbi)
+            const {textDecoder, textEncoder} = this
+            return Serialize.serializeAction(
+                contract,
+                action.account,
+                action.name,
+                action.authorization,
+                action.data,
+                textEncoder,
+                textDecoder
+            )
+        })
+        SigningRequest.transactionType.serialize(buf, {
+            ...transaction,
+            actions,
+        })
+        const serializedTransaction = buf.asUint8Array()
+        return new ResolvedSigningRequest(this, signer, transaction, serializedTransaction)
     }
 
     /**
@@ -686,11 +657,6 @@ export class SigningRequest {
             default:
                 throw new Error('Invalid signing request data')
         }
-    }
-
-    /** Return the actions in this request with their data decoded. */
-    public async getActions(abiProvider?: AbiProvider) {
-        return this.decodeActions(await this.resolveAbis(abiProvider))
     }
 
     /** Return the actions in this request with action data encoded. */
@@ -774,11 +740,88 @@ export class SigningRequest {
     }
 
     // Convenience methods.
+
     public toString() {
         return this.encode()
     }
+
     public toJSON() {
         return this.encode()
+    }
+}
+
+export class ResolvedSigningRequest {
+    /** Recreate a resolved request from a callback payload. */
+    static async fromPayload(
+        payload: CallbackPayload,
+        options: SigningRequestEncodingOptions = {}
+    ): Promise<ResolvedSigningRequest> {
+        const request = SigningRequest.from(payload.req, options)
+        const abis = await request.fetchAbis()
+        return request.resolve(
+            abis,
+            {actor: payload.sa, permission: payload.sp},
+            {
+                ref_block_num: Number(payload.rbn),
+                ref_block_prefix: Number(payload.rid),
+                expiration: payload.ex,
+            }
+        )
+    }
+
+    public readonly request: SigningRequest
+    public readonly signer: abi.PermissionLevel
+    public readonly transaction: abi.Transaction
+    public readonly serializedTransaction: Uint8Array
+
+    constructor(
+        request: SigningRequest,
+        signer: abi.PermissionLevel,
+        transaction: abi.Transaction,
+        serializedTransaction: Uint8Array
+    ) {
+        this.request = request
+        this.signer = signer
+        this.transaction = transaction
+        this.serializedTransaction = serializedTransaction
+    }
+
+    public getTransactionId(): string {
+        return Serialize.arrayToHex(sha256(this.serializedTransaction))
+    }
+
+    public getCallback(signatures: string[], blockNum?: number): ResolvedCallback | null {
+        const callback = this.request.data.callback
+        if (!callback) {
+            return null
+        }
+        if (!signatures || signatures.length === 0) {
+            throw new Error('Must have at least one signature to resolve callback')
+        }
+        const payload: CallbackPayload = {
+            sig: signatures[0],
+            tx: this.getTransactionId(),
+            rbn: String(this.transaction.ref_block_num),
+            rid: String(this.transaction.ref_block_prefix),
+            ex: this.transaction.expiration,
+            req: this.request.encode(),
+            sa: this.signer.actor,
+            sp: this.signer.permission,
+        }
+        for (const [n, sig] of signatures.slice(1).entries()) {
+            payload[`sig${n}`] = sig
+        }
+        if (blockNum) {
+            payload.bn = String(blockNum)
+        }
+        const url = callback.url.replace(/({{[a-z0-9]+}})/g, (_1, _2, m) => {
+            return payload[m] || ''
+        })
+        return {
+            background: callback.background,
+            payload,
+            url,
+        }
     }
 }
 
@@ -802,7 +845,7 @@ async function serializeAction(
         return action
     }
     let contractAbi: any
-    if (action.account === '' && action.name === 'identity') {
+    if (isIdentity(action)) {
         contractAbi = abi.data
     } else if (abiProvider) {
         contractAbi = await abiProvider.getAbi(action.account)
@@ -865,4 +908,12 @@ function variantId(chainId?: abi.ChainId | abi.ChainAlias): abi.VariantId {
 
 function isIdentity(action: abi.Action) {
     return action.account === '' && action.name === 'identity'
+}
+
+function hasTapos(tx: abi.Transaction) {
+    return !(
+        tx.expiration === '1970-01-01T00:00:00.000' &&
+        tx.ref_block_num === 0 &&
+        tx.ref_block_prefix === 0
+    )
 }
