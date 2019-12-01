@@ -244,6 +244,7 @@ describe('signing request', function() {
     it('should create identity tx', async function() {
         let req = await SigningRequest.identity(
             {
+                request_key: 'EOS6TXNeWW12K2owiRE67rxHKonBjdLyLPgq8C12fg6EVMrFFreQs',
                 callback: {
                     background: true,
                     url: 'https://example.com',
@@ -258,7 +259,10 @@ describe('signing request', function() {
                     account: '',
                     name: 'identity',
                     authorization: [],
-                    data: '000000000000285D00',
+                    data: {
+                        account: 'foo',
+                        request_key: 'PUB_K1_6TXNeWW12K2owiRE67rxHKonBjdLyLPgq8C12fg6EVMrEriLR9',
+                    },
                 },
             ],
             context_free_actions: [],

@@ -146,6 +146,11 @@ const ChainIdLookup = new Map<abi.ChainAlias, abi.ChainId>([
  */
 export const PlaceholderName = '............1' // aka uint64(1)
 
+export const PlaceholderAuth: abi.PermissionLevel = {
+    actor: PlaceholderName,
+    permission: PlaceholderName,
+}
+
 export type CallbackType = string | {url: string; background: boolean}
 
 export interface SigningRequestCreateArguments {
@@ -209,6 +214,7 @@ export interface SigningRequestEncodingOptions {
 
 export class SigningRequest {
     public static type = AbiTypes.get('signing_request')!
+    public static idType = AbiTypes.get('identity')!
 
     /** Create a new signing request. */
     public static async create(
@@ -473,6 +479,86 @@ export class SigningRequest {
         return buffer.asUint8Array()
     }
 
+    /** ABI definitions required to resolve request. */
+    public getRequiredAbis() {
+        return [
+            ...new Set(
+                this.getRawActions()
+                    .filter((action) => !isIdentity(action))
+                    .map((action) => action.account)
+            ),
+        ]
+    }
+
+    /** Resolve required ABI definitions. */
+    public async resolveAbis(abiProvider?: AbiProvider): Promise<Map<string, any>> {
+        const provider = abiProvider || this.abiProvider
+        if (!provider) {
+            throw new Error('Missing ABI provider')
+        }
+        const abis = new Map<string, any>()
+        await Promise.all(
+            this.getRequiredAbis().map(async (account) => {
+                abis.set(account, await provider.getAbi(account))
+            })
+        )
+        return abis
+    }
+
+    /**
+     * Decode raw actions actions to object representations.
+     * @param abis ABI defenitions required to decode all actions.
+     * @param signer Placeholders in actions will be resolved to signer if set.
+     */
+    public decodeActions(abis: Map<string, any>, signer?: abi.PermissionLevel): abi.Action[] {
+        return this.getRawActions().map((rawAction) => {
+            let contractAbi: any | undefined
+            if (isIdentity(rawAction)) {
+                contractAbi = abi.data
+            } else {
+                contractAbi = abis.get(rawAction.account)
+            }
+            if (!contractAbi) {
+                throw new Error(`Missing ABI definition for ${rawAction.account}`)
+            }
+            const contract = getContract(contractAbi)
+            if (signer) {
+                // hook into eosjs name decoder and return the signing account if we encounter the placeholder
+                // this is fine because getContract re-creates the initial types each time
+                contract.types.get('name')!.deserialize = (buffer: Serialize.SerialBuffer) => {
+                    const name = buffer.getName()
+                    if (name === PlaceholderName) {
+                        return signer.actor
+                    } else {
+                        return name
+                    }
+                }
+            }
+            const action = Serialize.deserializeAction(
+                contract,
+                rawAction.account,
+                rawAction.name,
+                rawAction.authorization,
+                rawAction.data as any,
+                this.textEncoder,
+                this.textDecoder
+            )
+            if (signer) {
+                action.authorization = action.authorization.map((auth) => {
+                    let {actor, permission} = auth
+                    if (actor === PlaceholderName) {
+                        actor = signer.actor
+                    }
+                    if (permission === PlaceholderName) {
+                        permission = signer.permission
+                    }
+                    return {actor, permission}
+                })
+            }
+            return action
+        })
+    }
+
     /**
      * Resolve request into a transaction that can be signed.
      * @param signer The auth that will sign the transaction, in the format
@@ -487,50 +573,7 @@ export class SigningRequest {
         abiProvider?: AbiProvider
     ) {
         signer = parseSigner(signer)
-        const req = this.data.req
-        let tx: abi.Transaction
-        switch (req[0]) {
-            case 'action':
-            case 'action[]':
-                tx = {
-                    actions: req[0] === 'action' ? [req[1]] : req[1],
-                    context_free_actions: [],
-                    transaction_extensions: [],
-                    expiration: '1970-01-01T00:00:00.000',
-                    ref_block_num: 0,
-                    ref_block_prefix: 0,
-                    max_cpu_usage_ms: 0,
-                    max_net_usage_words: 0,
-                    delay_sec: 0,
-                }
-                break
-            case 'transaction':
-                tx = req[1]
-                break
-            case 'identity':
-                const {account, request_key} = req[1]
-                tx = {
-                    actions: [
-                        {
-                            account: '',
-                            name: 'identity',
-                            authorization: [],
-                            data: {account, request_key},
-                        },
-                    ],
-                    context_free_actions: [],
-                    transaction_extensions: [],
-                    expiration: '1970-01-01T00:00:00.000',
-                    ref_block_num: 0,
-                    ref_block_prefix: 0,
-                    max_cpu_usage_ms: 0,
-                    max_net_usage_words: 0,
-                    delay_sec: 0,
-                }
-                break
-            default:
-                throw new Error('Invalid signing request data')
-        }
+        let tx = this.getRawTransaction()
         if (
             !this.isIdentity() &&
             tx.expiration === '1970-01-01T00:00:00.000' &&
@@ -563,48 +606,8 @@ export class SigningRequest {
                 )
             }
         }
-        const provider = abiProvider || this.abiProvider
-        if (!provider) {
-            throw new Error('Missing ABI provider')
-        }
-        const actions = await Promise.all(
-            tx.actions.map(async (rawAction) => {
-                if (
-                    rawAction.account === '' &&
-                    rawAction.name === 'identity' &&
-                    typeof rawAction.data === 'object'
-                ) {
-                    if (rawAction.data.account === PlaceholderName) {
-                        rawAction.data.account = (signer as abi.PermissionLevel).actor
-                    }
-                    return serializeAction(rawAction, this.textEncoder, this.textDecoder)
-                }
-                const contractAbi = await provider.getAbi(rawAction.account)
-                const contract = getContract(contractAbi)
-                // hook into eosjs name decoder and return the signing account if we encounter the placeholder
-                // this is fine because getContract re-creates the initial types each time
-                contract.types.get('name')!.deserialize = (buffer: Serialize.SerialBuffer) => {
-                    const name = buffer.getName()
-                    if (name === PlaceholderName) {
-                        return (signer as abi.PermissionLevel).actor
-                    } else {
-                        return name
-                    }
-                }
-                const action = this.deserializeAction(contract, rawAction)
-                action.authorization = action.authorization.map((val) => {
-                    const auth = {...val}
-                    if (auth.actor === PlaceholderName) {
-                        auth.actor = (signer as abi.PermissionLevel).actor
-                    }
-                    if (auth.permission === PlaceholderName) {
-                        auth.permission = (signer as abi.PermissionLevel).permission
-                    }
-                    return auth
-                })
-                return action
-            })
-        )
+        const abis = await this.resolveAbis(abiProvider)
+        const actions = this.decodeActions(abis, signer)
         return {...tx, actions}
     }
 
@@ -687,16 +690,7 @@ export class SigningRequest {
 
     /** Return the actions in this request with their data decoded. */
     public async getActions(abiProvider?: AbiProvider) {
-        const provider = abiProvider || this.abiProvider
-        if (!provider) {
-            throw new Error('Missing ABI provider')
-        }
-        const actions = this.getRawActions().map(async (action) => {
-            const contractAbi = await provider.getAbi(action.account)
-            const contract = getContract(contractAbi)
-            return this.deserializeAction(contract, action)
-        })
-        return Promise.all(actions)
+        return this.decodeActions(await this.resolveAbis(abiProvider))
     }
 
     /** Return the actions in this request with action data encoded. */
@@ -707,10 +701,47 @@ export class SigningRequest {
                 return [req[1]]
             case 'action[]':
                 return req[1]
+            case 'identity':
+                let buf = new Serialize.SerialBuffer({
+                    textDecoder: this.textDecoder,
+                    textEncoder: this.textEncoder,
+                })
+                SigningRequest.idType.serialize(buf, req[1])
+                return [
+                    {
+                        account: '',
+                        name: 'identity',
+                        authorization: [],
+                        data: Serialize.arrayToHex(buf.asUint8Array()),
+                    },
+                ]
             case 'transaction':
                 return req[1].actions
+            default:
+                throw new Error('Invalid signing request data')
+        }
+    }
+
+    /** Unresolved transaction. */
+    public getRawTransaction(): abi.Transaction {
+        const req = this.data.req
+        switch (req[0]) {
+            case 'transaction':
+                return req[1]
+            case 'action':
+            case 'action[]':
             case 'identity':
-                return []
+                return {
+                    actions: this.getRawActions(),
+                    context_free_actions: [],
+                    transaction_extensions: [],
+                    expiration: '1970-01-01T00:00:00.000',
+                    ref_block_num: 0,
+                    ref_block_prefix: 0,
+                    max_cpu_usage_ms: 0,
+                    max_net_usage_words: 0,
+                    delay_sec: 0,
+                }
             default:
                 throw new Error('Invalid signing request data')
         }
@@ -748,19 +779,6 @@ export class SigningRequest {
     }
     public toJSON() {
         return this.encode()
-    }
-
-    /** Helper that decodes the action data using provided contract. */
-    private deserializeAction(contract: Serialize.Contract, action: abi.Action) {
-        return Serialize.deserializeAction(
-            contract,
-            action.account,
-            action.name,
-            action.authorization,
-            action.data as any,
-            this.textEncoder,
-            this.textDecoder
-        )
     }
 }
 
@@ -843,4 +861,8 @@ function variantId(chainId?: abi.ChainId | abi.ChainAlias): abi.VariantId {
         }
         return ['chain_id', chainId]
     }
+}
+
+function isIdentity(action: abi.Action) {
+    return action.account === '' && action.name === 'identity'
 }
