@@ -1,12 +1,13 @@
 import * as assert from 'assert'
 import 'mocha'
 import {TextDecoder, TextEncoder} from 'util'
-import {SigningRequest, SigningRequestEncodingOptions, SignatureProvider} from '../src'
+import {SignatureProvider, SigningRequest, SigningRequestEncodingOptions} from '../src'
 import abiProvider from './utils/mock-abi-provider'
 import zlib from './utils/node-zlib-provider'
 
 const options: SigningRequestEncodingOptions = {
-    abiProvider, zlib,
+    abiProvider,
+    zlib,
     textDecoder: new TextDecoder(),
     textEncoder: new TextEncoder(),
 }
@@ -14,107 +15,142 @@ const options: SigningRequestEncodingOptions = {
 const timestamp = '2018-02-15T00:00:00.000'
 
 describe('signing request', function() {
-
     it('should create from action', async function() {
-        const request = await SigningRequest.create({
-            action: {
-                account: 'eosio.token',
-                name: 'transfer',
-                authorization: [{actor: 'foo', permission: 'active'}],
-                data: {from: 'foo', to: 'bar', quantity: '1.000 EOS', memo: 'hello there'},
+        const request = await SigningRequest.create(
+            {
+                action: {
+                    account: 'eosio.token',
+                    name: 'transfer',
+                    authorization: [{actor: 'foo', permission: 'active'}],
+                    data: {from: 'foo', to: 'bar', quantity: '1.000 EOS', memo: 'hello there'},
+                },
             },
-        }, options)
+            options
+        )
         assert.deepStrictEqual(request.data, {
             chain_id: ['chain_alias', 1],
-            req: ['action', {
-                account: 'eosio.token',
-                name: 'transfer',
-                authorization: [{actor: 'foo', permission: 'active'}],
-                data: '000000000000285D000000000000AE39E80300000000000003454F53000000000B68656C6C6F207468657265',
-            }],
+            req: [
+                'action',
+                {
+                    account: 'eosio.token',
+                    name: 'transfer',
+                    authorization: [{actor: 'foo', permission: 'active'}],
+                    data:
+                        '000000000000285D000000000000AE39E80300000000000003454F53000000000B68656C6C6F207468657265',
+                },
+            ],
             callback: null,
             broadcast: true,
         })
     })
 
     it('should create from actions', async function() {
-        const request = await SigningRequest.create({
-            actions: [{
-                account: 'eosio.token',
-                name: 'transfer',
-                authorization: [{actor: 'foo', permission: 'active'}],
-                data: {from: 'foo', to: 'bar', quantity: '1.000 EOS', memo: 'hello there'},
-            }, {
-                account: 'eosio.token',
-                name: 'transfer',
-                authorization: [{actor: 'baz', permission: 'active'}],
-                data: {from: 'baz', to: 'bar', quantity: '1.000 EOS', memo: 'hello there'},
-            }],
-        }, options)
+        const request = await SigningRequest.create(
+            {
+                actions: [
+                    {
+                        account: 'eosio.token',
+                        name: 'transfer',
+                        authorization: [{actor: 'foo', permission: 'active'}],
+                        data: {from: 'foo', to: 'bar', quantity: '1.000 EOS', memo: 'hello there'},
+                    },
+                    {
+                        account: 'eosio.token',
+                        name: 'transfer',
+                        authorization: [{actor: 'baz', permission: 'active'}],
+                        data: {from: 'baz', to: 'bar', quantity: '1.000 EOS', memo: 'hello there'},
+                    },
+                ],
+            },
+            options
+        )
         assert.deepStrictEqual(request.data, {
             chain_id: ['chain_alias', 1],
-            req: ['action[]', [{
-                account: 'eosio.token',
-                name: 'transfer',
-                authorization: [{actor: 'foo', permission: 'active'}],
-                data: '000000000000285D000000000000AE39E80300000000000003454F53000000000B68656C6C6F207468657265',
-            }, {
-                account: 'eosio.token',
-                name: 'transfer',
-                authorization: [{actor: 'baz', permission: 'active'}],
-                data: '000000000000BE39000000000000AE39E80300000000000003454F53000000000B68656C6C6F207468657265',
-            }]],
+            req: [
+                'action[]',
+                [
+                    {
+                        account: 'eosio.token',
+                        name: 'transfer',
+                        authorization: [{actor: 'foo', permission: 'active'}],
+                        data:
+                            '000000000000285D000000000000AE39E80300000000000003454F53000000000B68656C6C6F207468657265',
+                    },
+                    {
+                        account: 'eosio.token',
+                        name: 'transfer',
+                        authorization: [{actor: 'baz', permission: 'active'}],
+                        data:
+                            '000000000000BE39000000000000AE39E80300000000000003454F53000000000B68656C6C6F207468657265',
+                    },
+                ],
+            ],
             callback: null,
             broadcast: true,
         })
     })
 
     it('should create from transaction', async function() {
-        const request = await SigningRequest.create({
-            transaction: {
-                delay_sec: 123,
-                expiration: timestamp,
-                max_cpu_usage_ms: 99,
-                actions: [{
-                    account: 'eosio.token',
-                    name: 'transfer',
-                    authorization: [{actor: 'foo', permission: 'active'}],
-                    data: '000000000000285D000000000000AE39E80300000000000003454F53000000000B68656C6C6F207468657265',
-                }],
+        const request = await SigningRequest.create(
+            {
+                transaction: {
+                    delay_sec: 123,
+                    expiration: timestamp,
+                    max_cpu_usage_ms: 99,
+                    actions: [
+                        {
+                            account: 'eosio.token',
+                            name: 'transfer',
+                            authorization: [{actor: 'foo', permission: 'active'}],
+                            data:
+                                '000000000000285D000000000000AE39E80300000000000003454F53000000000B68656C6C6F207468657265',
+                        },
+                    ],
+                },
             },
-        }, options)
+            options
+        )
         assert.deepStrictEqual(request.data, {
             chain_id: ['chain_alias', 1],
-            req: ['transaction', {
-                actions: [{
-                    account: 'eosio.token',
-                    name: 'transfer',
-                    authorization: [{actor: 'foo', permission: 'active'}],
-                    data: '000000000000285D000000000000AE39E80300000000000003454F53000000000B68656C6C6F207468657265',
-                }],
-                context_free_actions: [],
-                delay_sec: 123,
-                expiration: timestamp,
-                max_cpu_usage_ms: 99,
-                max_net_usage_words: 0,
-                ref_block_num: 0,
-                ref_block_prefix: 0,
-                transaction_extensions: [],
-            }],
+            req: [
+                'transaction',
+                {
+                    actions: [
+                        {
+                            account: 'eosio.token',
+                            name: 'transfer',
+                            authorization: [{actor: 'foo', permission: 'active'}],
+                            data:
+                                '000000000000285D000000000000AE39E80300000000000003454F53000000000B68656C6C6F207468657265',
+                        },
+                    ],
+                    context_free_actions: [],
+                    delay_sec: 123,
+                    expiration: timestamp,
+                    max_cpu_usage_ms: 99,
+                    max_net_usage_words: 0,
+                    ref_block_num: 0,
+                    ref_block_prefix: 0,
+                    transaction_extensions: [],
+                },
+            ],
             callback: null,
             broadcast: true,
         })
     })
 
     it('should resolve to transaction', async function() {
-        const request = await SigningRequest.create({
-            action: {
-                account: 'eosio.token',
-                name: 'transfer',
-                authorization: [{actor: 'foo', permission: 'active'}],
-                data: {from: 'foo', to: 'bar', quantity: '1.000 EOS', memo: 'hello there'},
+        const request = await SigningRequest.create(
+            {
+                action: {
+                    account: 'eosio.token',
+                    name: 'transfer',
+                    authorization: [{actor: 'foo', permission: 'active'}],
+                    data: {from: 'foo', to: 'bar', quantity: '1.000 EOS', memo: 'hello there'},
+                },
             },
-        }, options)
+            options
+        )
         const tx = await request.getTransaction('foo@active', {
             timestamp,
             block_num: 1234,
@@ -123,12 +159,12 @@ describe('signing request', function() {
         })
         assert.deepStrictEqual(tx, {
             actions: [
-              {
-                account: 'eosio.token',
-                name: 'transfer',
-                authorization: [{actor: 'foo', permission: 'active'}],
-                data: {from: 'foo', to: 'bar', quantity: '1.000 EOS', memo: 'hello there'},
-              },
+                {
+                    account: 'eosio.token',
+                    name: 'transfer',
+                    authorization: [{actor: 'foo', permission: 'active'}],
+                    data: {from: 'foo', to: 'bar', quantity: '1.000 EOS', memo: 'hello there'},
+                },
             ],
             context_free_actions: [],
             transaction_extensions: [],
@@ -142,14 +178,22 @@ describe('signing request', function() {
     })
 
     it('should resolve with placeholder name', async function() {
-        const request = await SigningRequest.create({
-            action: {
-                account: 'eosio.token',
-                name: 'transfer',
-                authorization: [{actor: '............1', permission: '............1'}],
-                data: {from: '............1', to: 'bar', quantity: '1.000 EOS', memo: 'hello there'},
+        const request = await SigningRequest.create(
+            {
+                action: {
+                    account: 'eosio.token',
+                    name: 'transfer',
+                    authorization: [{actor: '............1', permission: '............1'}],
+                    data: {
+                        from: '............1',
+                        to: 'bar',
+                        quantity: '1.000 EOS',
+                        memo: 'hello there',
+                    },
+                },
             },
-        }, options)
+            options
+        )
         const tx = await request.getTransaction('foo@active', {
             timestamp,
             block_num: 1234,
@@ -158,12 +202,12 @@ describe('signing request', function() {
         })
         assert.deepStrictEqual(tx, {
             actions: [
-              {
-                account: 'eosio.token',
-                name: 'transfer',
-                authorization: [{actor: 'foo', permission: 'active'}],
-                data: {from: 'foo', to: 'bar', quantity: '1.000 EOS', memo: 'hello there'},
-              },
+                {
+                    account: 'eosio.token',
+                    name: 'transfer',
+                    authorization: [{actor: 'foo', permission: 'active'}],
+                    data: {from: 'foo', to: 'bar', quantity: '1.000 EOS', memo: 'hello there'},
+                },
             ],
             context_free_actions: [],
             transaction_extensions: [],
@@ -177,14 +221,17 @@ describe('signing request', function() {
     })
 
     it('should encode and decode requests', async function() {
-        const req1 = await SigningRequest.create({
-            action: {
-                account: 'eosio.token',
-                name: 'transfer',
-                authorization: [{actor: 'foo', permission: 'active'}],
-                data: {from: 'foo', to: 'bar', quantity: '1.0000 EOS', memo: 'hello there'},
+        const req1 = await SigningRequest.create(
+            {
+                action: {
+                    account: 'eosio.token',
+                    name: 'transfer',
+                    authorization: [{actor: 'foo', permission: 'active'}],
+                    data: {from: 'foo', to: 'bar', quantity: '1.0000 EOS', memo: 'hello there'},
+                },
             },
-        }, options)
+            options
+        )
         const encoded = req1.encode()
         assert.strictEqual(
             encoded,
@@ -192,14 +239,18 @@ describe('signing request', function() {
         )
         const req2 = SigningRequest.from(encoded, options)
         assert.deepStrictEqual(req2.data, req1.data)
-
     })
 
     it('should create identity tx', async function() {
-        let req = await SigningRequest.identity({callback: {
-            background: true,
-            url: 'https://example.com'
-        }}, options)
+        let req = await SigningRequest.identity(
+            {
+                callback: {
+                    background: true,
+                    url: 'https://example.com',
+                },
+            },
+            options
+        )
         let tx = await req.getTransaction('foo@bar')
         assert.deepStrictEqual(tx, {
             actions: [
@@ -232,7 +283,7 @@ describe('signing request', function() {
         const signatureProvider: SignatureProvider = {
             sign(message) {
                 return mockSig
-            }
+            },
         }
         const req1 = await SigningRequest.create(
             {
@@ -257,25 +308,30 @@ describe('signing request', function() {
     })
 
     it('should encode and decode test requests', async function() {
-        let req1uri = 'eosio:gWNgZGBY1mTC_MoglIGBIVzX5uxZoAgIaMSCyBVvjYx0kAUYGNZZvmCGsJhd_YNBNHdGak5OvkJJRmpRKiMDAA'
-        let req2uri = 'eosio:gWNgZGBY1mTC_MoglIGBIVzX5uxZoAgIaMSCyBVvjYx0kAUYGNZZvmCGsJhd_YNBNHdGak5OvkJJRmpRKkR3TDFQtYKjRZLW-rkn5z86tuzPxn7zSXZ7lkyOdFE_-tTE8_bqS4ab6vnUd_LqHG3ZVHCmNnW9qt6zEx9amy_k_FC6nqX1Uf7TdgA'
+        let req1uri =
+            'eosio:gWNgZGBY1mTC_MoglIGBIVzX5uxZoAgIaMSCyBVvjYx0kAUYGNZZvmCGsJhd_YNBNHdGak5OvkJJRmpRKiMDAA'
+        let req2uri =
+            'eosio:gWNgZGBY1mTC_MoglIGBIVzX5uxZoAgIaMSCyBVvjYx0kAUYGNZZvmCGsJhd_YNBNHdGak5OvkJJRmpRKkR3TDFQtYKjRZLW-rkn5z86tuzPxn7zSXZ7lkyOdFE_-tTE8_bqS4ab6vnUd_LqHG3ZVHCmNnW9qt6zEx9amy_k_FC6nqX1Uf7TdgA'
         let req1 = SigningRequest.from(req1uri, options)
         let req2 = SigningRequest.from(req2uri, options)
         assert.deepStrictEqual(req1.getActions(), req2.getActions())
         assert.strictEqual(req1.signature, undefined)
         assert.deepStrictEqual(req2.signature, {
-            signer: "foobar",
-            signature: "SIG_K1_KdHDFseJF6paedvSbfHFZzhbtBDVAM8LxeDJsrG33sENRbUQMFHX8CvtT9wRLo4fE4QGYtbp1rF6BqNQ6Pv5XgSocXwM67"
+            signer: 'foobar',
+            signature:
+                'SIG_K1_KdHDFseJF6paedvSbfHFZzhbtBDVAM8LxeDJsrG33sENRbUQMFHX8CvtT9wRLo4fE4QGYtbp1rF6BqNQ6Pv5XgSocXwM67',
         })
         assert.strictEqual(req1.encode(), req1uri)
         assert.strictEqual(req2.encode(), req2uri)
-        let req3uri = "eosio:gWNgZGZkgABGBqYI7x9Sxl36f-rbJt9s2lUzbYe3pdtE7WnPfxy7_pAph3k5A6NKTmZetpW-fnKGXmJeckZ-kR5IQN_QyNhE18TUzFzXwtLAgBEA"
+        let req3uri =
+            'eosio:gWNgZGZkgABGBqYI7x9Sxl36f-rbJt9s2lUzbYe3pdtE7WnPfxy7_pAph3k5A6NKTmZetpW-fnKGXmJeckZ-kR5IQN_QyNhE18TUzFzXwtLAgBEA'
         let req3 = SigningRequest.from(req3uri, options)
         assert.strictEqual(req3.isIdentity(), true)
         assert.strictEqual(req3.getIdentity(), null)
-        assert.strictEqual(req3.getIdentityKey(), "PUB_K1_5ZNmwoFDBPVnL2CYgZRpHqFfaK2M9bCFJJ1SapR9X4KPRdJ9eK")
+        assert.strictEqual(
+            req3.getIdentityKey(),
+            'PUB_K1_5ZNmwoFDBPVnL2CYgZRpHqFfaK2M9bCFJJ1SapR9X4KPRdJ9eK'
+        )
         assert.strictEqual(req3.encode(), req3uri)
     })
-
-
 })

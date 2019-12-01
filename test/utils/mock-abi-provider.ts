@@ -6,13 +6,12 @@ import {AbiProvider} from '../../src'
 // CONTRACT=eosio.token; cleos -u https://eos.greymass.com get abi $CONTRACT > test/abis/$CONTRACT.json
 
 export class MockAbiProvider implements AbiProvider {
-
     constructor(public readonly abis: {[account: string]: any}) {}
 
     public async getAbi(account: string) {
         const abi = this.abis[account]
         if (!abi) {
-            throw new Error(`No ABI for: ${ account }`)
+            throw new Error(`No ABI for: ${account}`)
         }
         return abi
     }
