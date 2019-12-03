@@ -864,21 +864,6 @@ async function serializeAction(
     )
 }
 
-function parseSigner(signer: string | abi.PermissionLevel): abi.PermissionLevel {
-    if (typeof signer === 'string') {
-        const [actor, permission] = signer.split('@')
-        signer = {actor, permission}
-    }
-    if (
-        typeof signer !== 'object' ||
-        typeof signer.actor !== 'string' ||
-        typeof signer.permission !== 'string'
-    ) {
-        throw new TypeError('Invalid signer')
-    }
-    return signer
-}
-
 function callbackValue(callback?: CallbackType): abi.Callback | null {
     if (typeof callback === 'string') {
         return {background: false, url: callback}
