@@ -330,6 +330,9 @@ export class SigningRequest {
 
     /** Creates a signing request from encoded `eosio:` uri string. */
     public static from(uri: string, options: SigningRequestEncodingOptions = {}) {
+        if (typeof uri !== 'string') {
+            throw new Error('Invalid request uri')
+        }
         const [scheme, path] = uri.split(':')
         if (scheme !== 'eosio' && scheme !== 'web+eosio') {
             throw new Error('Invalid scheme')
