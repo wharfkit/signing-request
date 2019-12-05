@@ -54,6 +54,12 @@ export interface SigningRequest {
     req: VariantReq
     flags: RequestFlags
     callback: string
+    info: InfoPair[]
+}
+
+export interface InfoPair {
+    key: string
+    value: Uint8Array | string /*bytes*/
 }
 
 export interface Identity {
@@ -198,7 +204,7 @@ export const data = {
                 },
                 {
                     name: 'value',
-                    type: 'string',
+                    type: 'bytes',
                 },
             ],
         },

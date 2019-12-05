@@ -405,4 +405,20 @@ describe('signing request', function() {
         )
         assert.strictEqual(req3.encode(), req3uri)
     })
+
+    it('should encode and decode with metadata', async function() {
+        let req = await SigningRequest.identity(
+            {
+                callback: 'https://example.com',
+                info: {
+                    foo: 'bar',
+                    baz: new Uint8Array([0x00, 0x01, 0x02]) as any,
+                },
+            },
+            options
+        )
+        let decoded = SigningRequest.from(req.encode(), options)
+        assert.deepStrictEqual(decoded.getInfo(), req.getInfo())
+        assert.deepStrictEqual(decoded.getInfo(), {foo: 'bar', baz: '\u0000\u0001\u0002'})
+    })
 })

@@ -188,7 +188,7 @@ export interface SigningRequestCreateArguments {
      */
     callback?: CallbackType
     /** Optional metadata to pass along with the request. */
-    info?: {[key: string]: string}
+    info?: {[key: string]: string | Uint8Array}
 }
 
 export interface SigningRequestCreateIdentityArguments {
@@ -213,7 +213,7 @@ export interface SigningRequestCreateIdentityArguments {
      */
     request_key?: string
     /** Optional metadata to pass along with the request. */
-    info?: {[key: string]: string}
+    info?: {[key: string]: string | Uint8Array}
 }
 
 export interface SigningRequestEncodingOptions {
@@ -315,9 +315,12 @@ export class SigningRequest {
         if (typeof args.info === 'object') {
             for (const key in args.info) {
                 if (args.info.hasOwnProperty(key)) {
-                    const value = args.info[key]
-                    if (typeof key !== 'string' || typeof value !== 'string') {
-                        throw new Error('Invalid info dict, keys and values must be strings')
+                    let value = args.info[key]
+                    if (typeof key !== 'string') {
+                        throw new Error('Invalid info dict, keys must be strings')
+                    }
+                    if (typeof value === 'string') {
+                        value = textEncoder.encode(value)
                     }
                     data.info.push({key, value})
                 }
@@ -354,6 +357,7 @@ export class SigningRequest {
                 },
                 broadcast: false,
                 callback: args.callback,
+                info: args.info,
             },
             options
         )
@@ -786,6 +790,25 @@ export class SigningRequest {
             return this.data.req[1].request_key || null
         }
         return null
+    }
+
+    /** Get raw info dict */
+    public getRawInfo(): {[key: string]: Uint8Array} {
+        let rv: {[key: string]: Uint8Array} = {}
+        for (const {key, value} of this.data.info) {
+            rv[key] = typeof value === 'string' ? Serialize.hexToUint8Array(value) : value
+        }
+        return rv
+    }
+
+    /** Get metadata values as strings. */
+    public getInfo(): {[key: string]: string} {
+        let rv: {[key: string]: string} = {}
+        let raw = this.getRawInfo()
+        for (const key of Object.keys(raw)) {
+            rv[key] = this.textDecoder.decode(raw[key])
+        }
+        return rv
     }
 
     // Convenience methods.
