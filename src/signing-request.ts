@@ -8,6 +8,8 @@ import sha256 from 'fast-sha256'
 import * as abi from './abi'
 import * as base64u from './base64u'
 
+const ProtocolVersion = 2
+
 const AbiTypes = Serialize.getTypesFromAbi(Serialize.createInitialTypes(), abi.data as any)
 
 /** Interface that should be implemented by abi providers. */
@@ -185,6 +187,8 @@ export interface SigningRequestCreateArguments {
      * broadcasting or signing. Passing a string means background = false.
      */
     callback?: CallbackType
+    /** Optional metadata to pass along with the request. */
+    info?: {[key: string]: string}
 }
 
 export interface SigningRequestCreateIdentityArguments {
@@ -208,6 +212,8 @@ export interface SigningRequestCreateIdentityArguments {
      * Request key, can be used to verify subsequent requests.
      */
     request_key?: string
+    /** Optional metadata to pass along with the request. */
+    info?: {[key: string]: string}
 }
 
 export interface SigningRequestEncodingOptions {
@@ -288,13 +294,38 @@ export class SigningRequest {
 
         // set the chain id
         data.chain_id = variantId(args.chainId)
+        data.flags = abi.RequestFlagsNone
 
-        // set the request options
-        data.broadcast = args.broadcast !== undefined ? args.broadcast : true
-        data.callback = callbackValue(args.callback)
+        const broadcast = args.broadcast !== undefined ? args.broadcast : true
+        if (broadcast) {
+            data.flags |= abi.RequestFlagsBroadcast
+        }
+        if (typeof args.callback === 'string') {
+            data.callback = args.callback
+        } else if (typeof args.callback === 'object') {
+            data.callback = args.callback.url
+            if (args.callback.background) {
+                data.flags |= abi.RequestFlagsBackground
+            }
+        } else {
+            data.callback = ''
+        }
+
+        data.info = []
+        if (typeof args.info === 'object') {
+            for (const key in args.info) {
+                if (args.info.hasOwnProperty(key)) {
+                    const value = args.info[key]
+                    if (typeof key !== 'string' || typeof value !== 'string') {
+                        throw new Error('Invalid info dict, keys and values must be strings')
+                    }
+                    data.info.push({key, value})
+                }
+            }
+        }
 
         const req = new SigningRequest(
-            1,
+            ProtocolVersion,
             data,
             textEncoder,
             textDecoder,
@@ -334,14 +365,14 @@ export class SigningRequest {
             throw new Error('Invalid request uri')
         }
         const [scheme, path] = uri.split(':')
-        if (scheme !== 'eosio' && scheme !== 'web+eosio') {
+        if (scheme !== 'esr' && scheme !== 'web+esr') {
             throw new Error('Invalid scheme')
         }
         const data = base64u.decode(path.startsWith('//') ? path.slice(2) : path)
         const header = data[0]
         const version = header & ~(1 << 7)
-        if (version !== 1) {
-            throw new Error('Invalid protocol version')
+        if (version !== ProtocolVersion) {
+            throw new Error('Unsupported protocol version')
         }
         let array = data.slice(1)
         if ((header & (1 << 7)) !== 0) {
@@ -401,10 +432,10 @@ export class SigningRequest {
         abiProvider?: AbiProvider,
         signature?: abi.RequestSignature
     ) {
-        if (data.broadcast === true && data.req[0] === 'identity') {
+        if ((data.flags & abi.RequestFlagsBroadcast) !== 0 && data.req[0] === 'identity') {
             throw new Error('Invalid request (identity request cannot be broadcast)')
         }
-        if (data.broadcast === false && data.broadcast == null) {
+        if ((data.flags & abi.RequestFlagsBroadcast) === 0 && data.callback.length === 0) {
             throw new Error('Invalid request (nothing to do, no broadcast or callback set)')
         }
         this.version = version
@@ -425,20 +456,23 @@ export class SigningRequest {
             textEncoder: this.textEncoder,
             textDecoder: this.textDecoder,
         })
-        buffer.pushArray([0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74]) // utf8 "request"
+        // protocol version + utf8 "request"
+        buffer.pushArray([this.version, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74])
         buffer.pushArray(this.getData())
         const message = sha256(buffer.asUint8Array())
         this.signature = signatureProvider.sign(Serialize.arrayToHex(message))
     }
 
     /**
-     * Encode this request into an `eosio:` uri.
+     * Encode this request into an `esr:` uri.
      * @argument compress Whether to compress the request data using zlib,
      *                    defaults to true if omitted and zlib is present;
      *                    otherwise false.
-     * @returns An `eosio:` uri string.
+     * @argument slashes Whether add slashes after the protocol scheme, i.e. `esr://`.
+     *                   Defaults to true.
+     * @returns An esr uri string.
      */
-    public encode(compress?: boolean): string {
+    public encode(compress?: boolean, slashes?: boolean): string {
         const shouldCompress = compress !== undefined ? compress : this.zlib !== undefined
         if (shouldCompress && this.zlib === undefined) {
             throw new Error('Need zlib to compress')
@@ -456,7 +490,11 @@ export class SigningRequest {
         const out = new Uint8Array(1 + array.byteLength)
         out[0] = header
         out.set(array, 1)
-        return 'eosio:' + base64u.encode(out)
+        let scheme = 'esr:'
+        if (slashes !== false) {
+            scheme += '//'
+        }
+        return scheme + base64u.encode(out)
     }
 
     /** Get the request data without header or signature. */
@@ -721,6 +759,14 @@ export class SigningRequest {
         return this.data.req[0] === 'identity'
     }
 
+    /** Whether the request should be broadcast by signer. */
+    public shouldBroadcast(): boolean {
+        if (this.isIdentity()) {
+            return false
+        }
+        return (this.data.flags & abi.RequestFlagsBroadcast) !== 0
+    }
+
     /**
      * Present if the request is an identity request and requests a specific account.
      * @note This returns `nil` unless a specific identity has been requested,
@@ -794,8 +840,8 @@ export class ResolvedSigningRequest {
     }
 
     public getCallback(signatures: string[], blockNum?: number): ResolvedCallback | null {
-        const callback = this.request.data.callback
-        if (!callback) {
+        const {callback, flags} = this.request.data
+        if (!callback || callback.length === 0) {
             return null
         }
         if (!signatures || signatures.length === 0) {
@@ -817,11 +863,11 @@ export class ResolvedSigningRequest {
         if (blockNum) {
             payload.bn = String(blockNum)
         }
-        const url = callback.url.replace(/({{[a-z0-9]+}})/g, (_1, _2, m) => {
+        const url = callback.replace(/({{[a-z0-9]+}})/g, (_1, _2, m) => {
             return payload[m] || ''
         })
         return {
-            background: callback.background,
+            background: (flags & abi.RequestFlagsBackground) !== 0,
             payload,
             url,
         }
@@ -865,15 +911,6 @@ async function serializeAction(
         textEncoder,
         textDecoder
     )
-}
-
-function callbackValue(callback?: CallbackType): abi.Callback | null {
-    if (typeof callback === 'string') {
-        return {background: false, url: callback}
-    } else if (typeof callback === 'object') {
-        return callback
-    }
-    return null
 }
 
 function variantId(chainId?: abi.ChainId | abi.ChainAlias): abi.VariantId {

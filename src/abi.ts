@@ -17,6 +17,11 @@ export interface PermissionLevel {
     permission: PermissionName
 }
 
+export type RequestFlags = number
+export const RequestFlagsNone = 0
+export const RequestFlagsBroadcast = 1 << 0
+export const RequestFlagsBackground = 1 << 1
+
 export interface Action {
     account: AccountName
     name: ActionName
@@ -44,16 +49,11 @@ export interface Transaction extends TransactionHeader {
     transaction_extensions: Extension[]
 }
 
-export interface Callback {
-    url: string /*string*/
-    background: boolean
-}
-
 export interface SigningRequest {
     chain_id: VariantId
     req: VariantReq
-    broadcast: boolean
-    callback: Callback | undefined | null
+    flags: RequestFlags
+    callback: string
 }
 
 export interface Identity {
@@ -88,6 +88,10 @@ export const data = {
         {
             new_type_name: 'chain_id',
             type: 'checksum256',
+        },
+        {
+            new_type_name: 'request_flags',
+            type: 'uint8',
         },
     ],
     structs: [
@@ -186,15 +190,15 @@ export const data = {
             ],
         },
         {
-            name: 'callback',
+            name: 'info_pair',
             fields: [
                 {
-                    name: 'url',
+                    name: 'key',
                     type: 'string',
                 },
                 {
-                    name: 'background',
-                    type: 'bool',
+                    name: 'value',
+                    type: 'string',
                 },
             ],
         },
@@ -210,12 +214,16 @@ export const data = {
                     type: 'variant_req',
                 },
                 {
-                    name: 'broadcast',
-                    type: 'bool',
+                    name: 'flags',
+                    type: 'request_flags',
                 },
                 {
                     name: 'callback',
-                    type: 'callback?',
+                    type: 'string',
+                },
+                {
+                    name: 'info',
+                    type: 'info_pair[]',
                 },
             ],
         },
