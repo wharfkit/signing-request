@@ -1,5 +1,5 @@
 /**
- * EOSIO URI Signing Request.
+ * EOSIO Signing Request (ESR).
  */
 
 import {Serialize} from 'eosjs'
@@ -363,7 +363,45 @@ export class SigningRequest {
         )
     }
 
-    /** Creates a signing request from encoded `eosio:` uri string. */
+    /**
+     * Create a request from a chain id and serialized transaction.
+     * @param chainId The chain id where the transaction is valid.
+     * @param serializedTransaction The serialized transaction.
+     * @param options Creation options.
+     */
+    public static fromTransaction(
+        chainId: Uint8Array | string,
+        serializedTransaction: Uint8Array | string,
+        options: SigningRequestEncodingOptions = {}
+    ) {
+        if (typeof chainId !== 'string') {
+            chainId = Serialize.arrayToHex(chainId)
+        }
+        if (typeof serializedTransaction === 'string') {
+            serializedTransaction = Serialize.hexToUint8Array(serializedTransaction)
+        }
+        let buf = new Serialize.SerialBuffer({
+            textDecoder: options.textDecoder,
+            textEncoder: options.textEncoder,
+        })
+        buf.push(2) // header
+        const id = variantId(chainId)
+        if (id[0] === 'chain_alias') {
+            buf.push(0)
+            buf.push(id[1])
+        } else {
+            buf.push(1)
+            buf.pushArray(Serialize.hexToUint8Array(id[1]))
+        }
+        buf.push(2) // transaction variant
+        buf.pushArray(serializedTransaction)
+        buf.push(abi.RequestFlagsBroadcast) // flags
+        buf.push(0) // callback
+        buf.push(0) // info
+        return SigningRequest.fromData(buf.asUint8Array(), options)
+    }
+
+    /** Creates a signing request from encoded `esr:` uri string. */
     public static from(uri: string, options: SigningRequestEncodingOptions = {}) {
         if (typeof uri !== 'string') {
             throw new Error('Invalid request uri')
@@ -373,6 +411,10 @@ export class SigningRequest {
             throw new Error('Invalid scheme')
         }
         const data = base64u.decode(path.startsWith('//') ? path.slice(2) : path)
+        return SigningRequest.fromData(data, options)
+    }
+
+    public static fromData(data: Uint8Array, options: SigningRequestEncodingOptions = {}) {
         const header = data[0]
         const version = header & ~(1 << 7)
         if (version !== ProtocolVersion) {
@@ -456,6 +498,14 @@ export class SigningRequest {
      * @param signatureProvider The signature provider that provides a signature for the signer.
      */
     public sign(signatureProvider: SignatureProvider) {
+        const message = this.getSignatureDigest()
+        this.signature = signatureProvider.sign(Serialize.arrayToHex(message))
+    }
+
+    /**
+     * Get the signature digest for this request.
+     */
+    public getSignatureDigest() {
         const buffer = new Serialize.SerialBuffer({
             textEncoder: this.textEncoder,
             textDecoder: this.textDecoder,
@@ -463,8 +513,42 @@ export class SigningRequest {
         // protocol version + utf8 "request"
         buffer.pushArray([this.version, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74])
         buffer.pushArray(this.getData())
-        const message = sha256(buffer.asUint8Array())
-        this.signature = signatureProvider.sign(Serialize.arrayToHex(message))
+        return sha256(buffer.asUint8Array())
+    }
+
+    /**
+     * Set the signature data for this request, mutating.
+     * @param signer Account name of signer.
+     * @param signature The signature string.
+     */
+    public setSignature(signer: string, signature: string) {
+        this.signature = {signer, signature}
+    }
+
+    /**
+     * Set the request callback, mutating.
+     * @param url Where the callback should be sent.
+     * @param background Whether the callback should be sent in the background.
+     */
+    public setCallback(url: string, background: boolean) {
+        this.data.callback = url
+        if (background) {
+            this.data.flags |= abi.RequestFlagsBackground
+        } else {
+            this.data.flags &= ~abi.RequestFlagsBackground
+        }
+    }
+
+    /**
+     * Set broadcast flag.
+     * @param broadcast Whether the transaction should be broadcast by receiver.
+     */
+    public setBroadcast(broadcast: boolean) {
+        if (broadcast) {
+            this.data.flags |= abi.RequestFlagsBroadcast
+        } else {
+            this.data.flags &= ~abi.RequestFlagsBroadcast
+        }
     }
 
     /**
