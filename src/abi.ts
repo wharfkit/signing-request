@@ -63,8 +63,7 @@ export interface InfoPair {
 }
 
 export interface Identity {
-    account: AccountName
-    request_key: string | undefined | null /*public_key*/
+    permission: PermissionLevel | undefined | null
 }
 
 export interface RequestSignature {
@@ -237,12 +236,8 @@ export const data = {
             name: 'identity',
             fields: [
                 {
-                    name: 'account',
-                    type: 'name',
-                },
-                {
-                    name: 'request_key',
-                    type: 'public_key?',
+                    name: 'permission',
+                    type: 'permission_level?',
                 },
             ],
         },

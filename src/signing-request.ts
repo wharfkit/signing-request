@@ -159,9 +159,12 @@ const ChainIdLookup = new Map<abi.ChainAlias, abi.ChainId>([
  */
 export const PlaceholderName = '............1' // aka uint64(1)
 
+/** Placeholder that will resolve to signer permission name. */
+export const PlaceholderPermission = '............2' // aka uint64(2)
+
 export const PlaceholderAuth: abi.PermissionLevel = {
     actor: PlaceholderName,
-    permission: PlaceholderName,
+    permission: PlaceholderPermission,
 }
 
 export type CallbackType = string | {url: string; background: boolean}
@@ -204,14 +207,10 @@ export interface SigningRequestCreateIdentityArguments {
      */
     account?: string
     /**
-     * Requester of identity.
-     * Defaults to null name (`.............`) if omitted.
+     * Requested account permission.
+     * Defaults to placeholder (any permission) if omitted.
      */
-    sender?: string
-    /**
-     * Request key, can be used to verify subsequent requests.
-     */
-    request_key?: string
+    permission?: string
     /** Optional metadata to pass along with the request. */
     info?: {[key: string]: string | Uint8Array}
 }
@@ -349,11 +348,20 @@ export class SigningRequest {
         args: SigningRequestCreateIdentityArguments,
         options: SigningRequestEncodingOptions = {}
     ) {
+        let permission: abi.PermissionLevel | null = {
+            actor: args.account || PlaceholderName,
+            permission: args.permission || PlaceholderPermission,
+        }
+        if (
+            permission.actor === PlaceholderName &&
+            permission.permission === PlaceholderPermission
+        ) {
+            permission = null
+        }
         return this.create(
             {
                 identity: {
-                    account: args.account || PlaceholderName,
-                    request_key: args.request_key || null,
+                    permission,
                 },
                 broadcast: false,
                 callback: args.callback,
@@ -668,6 +676,8 @@ export class SigningRequest {
                     const name = buffer.getName()
                     if (name === PlaceholderName) {
                         return signer.actor
+                    } else if (name === PlaceholderPermission) {
+                        return signer.permission
                     } else {
                         return name
                     }
@@ -688,6 +698,10 @@ export class SigningRequest {
                     if (actor === PlaceholderName) {
                         actor = signer.actor
                     }
+                    if (permission === PlaceholderPermission) {
+                        permission = signer.permission
+                    }
+                    // backwards compatibility, actor placeholder will also resolve to permission when used in auth
                     if (permission === PlaceholderName) {
                         permission = signer.permission
                     }
@@ -800,17 +814,21 @@ export class SigningRequest {
             case 'action[]':
                 return req[1]
             case 'identity':
-                let buf = new Serialize.SerialBuffer({
-                    textDecoder: this.textDecoder,
-                    textEncoder: this.textEncoder,
-                })
-                SigningRequest.idType.serialize(buf, req[1])
+                let data: string = '0101000000000000000200000000000000' // placeholder permission
+                if (req[1].permission) {
+                    let buf = new Serialize.SerialBuffer({
+                        textDecoder: this.textDecoder,
+                        textEncoder: this.textEncoder,
+                    })
+                    SigningRequest.idType.serialize(buf, req[1])
+                    data = Serialize.arrayToHex(buf.asUint8Array())
+                }
                 return [
                     {
                         account: '',
                         name: 'identity',
                         authorization: [],
-                        data: Serialize.arrayToHex(buf.asUint8Array()),
+                        data,
                     },
                 ]
             case 'transaction':
@@ -864,17 +882,22 @@ export class SigningRequest {
      *       use `isIdentity` to check id requests.
      */
     public getIdentity(): string | null {
-        if (this.data.req[0] === 'identity') {
-            const {account} = this.data.req[1]
-            return account === PlaceholderName ? null : account
+        if (this.data.req[0] === 'identity' && this.data.req[1].permission) {
+            const {actor} = this.data.req[1].permission
+            return actor === PlaceholderName ? null : actor
         }
         return null
     }
 
-    /** Present if the request is an identity request and specifies a request key. */
-    public getIdentityKey(): string | null {
-        if (this.data.req[0] === 'identity') {
-            return this.data.req[1].request_key || null
+    /**
+     * Present if the request is an identity request and requests a specific permission.
+     * @note This returns `nil` unless a specific permission has been requested,
+     *       use `isIdentity` to check id requests.
+     */
+    public getIdentityPermission(): string | null {
+        if (this.data.req[0] === 'identity' && this.data.req[1].permission) {
+            const {permission} = this.data.req[1].permission
+            return permission === PlaceholderName ? null : permission
         }
         return null
     }

@@ -167,7 +167,7 @@ describe('signing request', function() {
                 {
                     account: 'eosio.token',
                     name: 'transfer',
-                    authorization: [PlaceholderAuth],
+                    authorization: [{actor: PlaceholderName, permission: PlaceholderName}],
                     data:
                         '0100000000000000000000000000285D01000000000000000050454E47000000135468616E6B7320666F72207468652066697368',
                 },
@@ -227,10 +227,10 @@ describe('signing request', function() {
                 action: {
                     account: 'eosio.token',
                     name: 'transfer',
-                    authorization: [{actor: '............1', permission: '............1'}],
+                    authorization: [PlaceholderAuth],
                     data: {
                         from: '............1',
-                        to: 'bar',
+                        to: '............2',
                         quantity: '1.000 EOS',
                         memo: 'hello there',
                     },
@@ -241,7 +241,7 @@ describe('signing request', function() {
         const abis = await request.fetchAbis()
         const tx = await request.resolveTransaction(
             abis,
-            {actor: 'foo', permission: 'active'},
+            {actor: 'foo', permission: 'mractive'},
             {
                 timestamp,
                 block_num: 1234,
@@ -254,8 +254,8 @@ describe('signing request', function() {
                 {
                     account: 'eosio.token',
                     name: 'transfer',
-                    authorization: [{actor: 'foo', permission: 'active'}],
-                    data: {from: 'foo', to: 'bar', quantity: '1.000 EOS', memo: 'hello there'},
+                    authorization: [{actor: 'foo', permission: 'mractive'}],
+                    data: {from: 'foo', to: 'mractive', quantity: '1.000 EOS', memo: 'hello there'},
                 },
             ],
             context_free_actions: [],
@@ -279,7 +279,7 @@ describe('signing request', function() {
                 action: {
                     account: 'eosio.token',
                     name: 'transfer',
-                    authorization: [PlaceholderAuth],
+                    authorization: [{actor: PlaceholderName, permission: PlaceholderName}],
                     data: {
                         from: PlaceholderName,
                         to: 'foo',
@@ -302,7 +302,6 @@ describe('signing request', function() {
     it('should create identity tx', async function() {
         let req = await SigningRequest.identity(
             {
-                request_key: 'EOS6TXNeWW12K2owiRE67rxHKonBjdLyLPgq8C12fg6EVMrFFreQs',
                 callback: {
                     background: true,
                     url: 'https://example.com',
@@ -321,8 +320,10 @@ describe('signing request', function() {
                     name: 'identity',
                     authorization: [],
                     data: {
-                        account: 'foo',
-                        request_key: 'PUB_K1_6TXNeWW12K2owiRE67rxHKonBjdLyLPgq8C12fg6EVMrEriLR9',
+                        permission: {
+                            actor: 'foo',
+                            permission: 'bar',
+                        },
                     },
                 },
             ],
@@ -394,16 +395,39 @@ describe('signing request', function() {
         })
         assert.strictEqual(req1.encode(), req1uri)
         assert.strictEqual(req2.encode(), req2uri)
-        let req3uri =
-            'esr://gmNgZGZkgABGBqYI7x9Sxl36f-rbJt9s2lUzbYe3pdtE7WnPfxy7_pAph3k5k2pGSUlBsZW-fnKGXmJeckZ-kV5OZl62vqGRsYmuiamZua6FpYEBAwA'
-        let req3 = SigningRequest.from(req3uri, options)
-        assert.strictEqual(req3.isIdentity(), true)
-        assert.strictEqual(req3.getIdentity(), null)
-        assert.strictEqual(
-            req3.getIdentityKey(),
-            'PUB_K1_5ZNmwoFDBPVnL2CYgZRpHqFfaK2M9bCFJJ1SapR9X4KPRdJ9eK'
-        )
-        assert.strictEqual(req3.encode(), req3uri)
+    })
+
+    it('should generate correct identity requests', async function() {
+        let reqUri = 'esr://AgABAwACJWh0dHBzOi8vY2guYW5jaG9yLmxpbmsvMTIzNC00NTY3LTg5MDAA'
+        let req = SigningRequest.from(reqUri, options)
+        assert.strictEqual(req.isIdentity(), true)
+        assert.strictEqual(req.getIdentity(), null)
+        assert.strictEqual(req.getIdentityPermission(), null)
+        assert.strictEqual(req.encode(), reqUri)
+        let resolved = req.resolve(new Map(), {actor: 'foo', permission: 'bar'})
+        assert.deepStrictEqual(resolved.transaction, {
+            actions: [
+                {
+                    account: '',
+                    name: 'identity',
+                    authorization: [],
+                    data: {
+                        permission: {
+                            actor: 'foo',
+                            permission: 'bar',
+                        },
+                    },
+                },
+            ],
+            context_free_actions: [],
+            delay_sec: 0,
+            expiration: '1970-01-01T00:00:00.000',
+            max_cpu_usage_ms: 0,
+            max_net_usage_words: 0,
+            ref_block_num: 0,
+            ref_block_prefix: 0,
+            transaction_extensions: [],
+        })
     })
 
     it('should encode and decode with metadata', async function() {
