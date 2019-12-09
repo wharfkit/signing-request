@@ -572,8 +572,11 @@ export class SigningRequest {
         array.set(data, 0)
         array.set(sigData, data.byteLength)
         if (shouldCompress) {
-            header |= 1 << 7
-            array = this.zlib!.deflateRaw(array)
+            const deflated = this.zlib!.deflateRaw(array)
+            if (array.byteLength > deflated.byteLength) {
+                header |= 1 << 7
+                array = deflated
+            }
         }
         const out = new Uint8Array(1 + array.byteLength)
         out[0] = header
