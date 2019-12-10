@@ -1,14 +1,14 @@
 {
-  "defaultSeverity": "error",
-  "extends": ["tslint:recommended"],
+  "extends": [
+    "tslint-plugin-prettier",
+    "tslint-config-prettier"
+  ],
   "rules": {
-    "indent": [true, "spaces", 4],
-    "interface-name": [true, "never-prefix"],
-    "max-classes-per-file": false,
-    "no-bitwise": false,
-    "object-literal-sort-keys": false,
-    "quotemark": [true, "single", "avoid-escape"],
-    "semicolon": [true, "never"],
-    "triple-equals": [true, "allow-null-check"]
+    "prettier": true,
+    "triple-equals": [
+      true,
+      "allow-null-check"
+    ],
+    "ordered-imports": true
   }
 }

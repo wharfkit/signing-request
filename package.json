@@ -6,20 +6,24 @@
   "main": "./lib/index",
   "typings": "./lib/index",
   "scripts": {
-    "prepublish": "make lib"
+    "prepare": "make lib"
   },
   "files": [
     "lib/*"
   ],
   "dependencies": {
-    "eosjs": "^20.0.0"
+    "eosjs": "^20.0.0",
+    "fast-sha256": "^1.1.1"
   },
   "devDependencies": {
     "@types/mocha": "^5.2.7",
     "@types/node": "^12.0.8",
     "mocha": "^6.1.4",
+    "prettier": "^1.19.1",
     "ts-node": "^8.2.0",
     "tslint": "^5.12.0",
+    "tslint-config-prettier": "^1.18.0",
+    "tslint-plugin-prettier": "^2.0.1",
     "typescript": "^3.2.2"
   }
 }
