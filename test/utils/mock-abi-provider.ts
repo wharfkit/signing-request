@@ -6,13 +6,12 @@ import {AbiProvider} from '../../src'
 // CONTRACT=eosio.token; cleos -u https://eos.greymass.com get abi $CONTRACT > test/abis/$CONTRACT.json
 
 export class MockAbiProvider implements AbiProvider {
-
-    constructor(public readonly abis: {[account: string]: any}) {}
+    constructor(public readonly abis: Map<string, any>) {}
 
     public async getAbi(account: string) {
-        const abi = this.abis[account]
+        const abi = this.abis.get(account)
         if (!abi) {
-            throw new Error(`No ABI for: ${ account }`)
+            throw new Error(`No ABI for: ${account}`)
         }
         return abi
     }
@@ -20,9 +19,9 @@ export class MockAbiProvider implements AbiProvider {
 
 function createTestProvider() {
     const dir = joinPath(__dirname, '../abis')
-    const abis: {[account: string]: any} = {}
+    const abis = new Map<string, any>()
     readdir(dir).forEach((name) => {
-        abis[name.slice(0, -5)] = JSON.parse(readfile(joinPath(dir, name)).toString('utf8'))
+        abis.set(name.slice(0, -5), JSON.parse(readfile(joinPath(dir, name)).toString('utf8')))
     })
     return new MockAbiProvider(abis)
 }

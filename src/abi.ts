@@ -6,18 +6,27 @@ export type PermissionName = string /*name*/
 export type ChainAlias = number /*uint8*/
 export type ChainId = string /*checksum256*/
 export type VariantId = ['chain_alias', ChainAlias] | ['chain_id', ChainId]
-export type VariantReq = ['action', Action] | ['action[]', Action[]] | ['transaction', Transaction]
+export type VariantReq =
+    | ['action', Action]
+    | ['action[]', Action[]]
+    | ['transaction', Transaction]
+    | ['identity', Identity]
 
 export interface PermissionLevel {
     actor: AccountName
     permission: PermissionName
 }
 
+export type RequestFlags = number
+export const RequestFlagsNone = 0
+export const RequestFlagsBroadcast = 1 << 0
+export const RequestFlagsBackground = 1 << 1
+
 export interface Action {
     account: AccountName
     name: ActionName
     authorization: PermissionLevel[]
-    data: string | { [key: string]: any }
+    data: string | {[key: string]: any}
 }
 
 export interface Extension {
@@ -40,16 +49,26 @@ export interface Transaction extends TransactionHeader {
     transaction_extensions: Extension[]
 }
 
-export interface Callback {
-    url: string /*string*/
-    background: boolean
-}
-
 export interface SigningRequest {
     chain_id: VariantId
     req: VariantReq
-    broadcast: boolean
-    callback: Callback | undefined
+    flags: RequestFlags
+    callback: string
+    info: InfoPair[]
+}
+
+export interface InfoPair {
+    key: string
+    value: Uint8Array | string /*bytes*/
+}
+
+export interface Identity {
+    permission: PermissionLevel | undefined | null
+}
+
+export interface RequestSignature {
+    signer: AccountName
+    signature: string
 }
 
 export const data = {
@@ -74,6 +93,10 @@ export const data = {
         {
             new_type_name: 'chain_id',
             type: 'checksum256',
+        },
+        {
+            new_type_name: 'request_flags',
+            type: 'uint8',
         },
     ],
     structs: [
@@ -172,15 +195,15 @@ export const data = {
             ],
         },
         {
-            name: 'callback',
+            name: 'info_pair',
             fields: [
                 {
-                    name: 'url',
+                    name: 'key',
                     type: 'string',
                 },
                 {
-                    name: 'background',
-                    type: 'bool',
+                    name: 'value',
+                    type: 'bytes',
                 },
             ],
         },
@@ -196,12 +219,38 @@ export const data = {
                     type: 'variant_req',
                 },
                 {
-                    name: 'broadcast',
-                    type: 'bool',
+                    name: 'flags',
+                    type: 'request_flags',
                 },
                 {
                     name: 'callback',
-                    type: 'callback?',
+                    type: 'string',
+                },
+                {
+                    name: 'info',
+                    type: 'info_pair[]',
+                },
+            ],
+        },
+        {
+            name: 'identity',
+            fields: [
+                {
+                    name: 'permission',
+                    type: 'permission_level?',
+                },
+            ],
+        },
+        {
+            name: 'request_signature',
+            fields: [
+                {
+                    name: 'signer',
+                    type: 'name',
+                },
+                {
+                    name: 'signature',
+                    type: 'signature',
                 },
             ],
         },
@@ -213,7 +262,13 @@ export const data = {
         },
         {
             name: 'variant_req',
-            types: ['action', 'action[]', 'transaction'],
+            types: ['action', 'action[]', 'transaction', 'identity'],
+        },
+    ],
+    actions: [
+        {
+            name: 'identity',
+            type: 'identity',
         },
     ],
 }

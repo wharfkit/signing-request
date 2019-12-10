@@ -29,9 +29,9 @@ export function encode(data: Uint8Array): string {
 
         // Use bitmasks to extract 6-bit segments from the triplet
         a = (chunk & 16515072) >> 18 // 16515072 = (2^6 - 1) << 18
-        b = (chunk & 258048) >> 12   // 258048   = (2^6 - 1) << 12
-        c = (chunk & 4032) >> 6      // 4032     = (2^6 - 1) << 6
-        d = chunk & 63               // 63       =  2^6 - 1
+        b = (chunk & 258048) >> 12 // 258048   = (2^6 - 1) << 12
+        c = (chunk & 4032) >> 6 // 4032     = (2^6 - 1) << 6
+        d = chunk & 63 // 63       =  2^6 - 1
 
         // Convert the raw binary segments to the appropriate ASCII encoding
         parts.push(charset[a] + charset[b] + charset[c] + charset[d])
@@ -51,7 +51,7 @@ export function encode(data: Uint8Array): string {
         chunk = (data[mainLength] << 8) | data[mainLength + 1]
 
         a = (chunk & 64512) >> 10 // 64512 = (2^6 - 1) << 10
-        b = (chunk & 1008) >> 4   // 1008  = (2^6 - 1) << 4
+        b = (chunk & 1008) >> 4 // 1008  = (2^6 - 1) << 4
 
         // Set the 2 least significant bits to zero
         c = (chunk & 15) << 2 // 15    = 2^4 - 1
