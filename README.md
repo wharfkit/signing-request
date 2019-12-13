@@ -1,8 +1,7 @@
-
-eosio-uri
+eosio-signing-request (rev.2)
 =========
 
-URI protocol for facilitating signing of EOSIO transactions.
+Signing protocol to facilitate the signing of EOSIO transactions.
 
 ### Example Data
 
@@ -10,11 +9,10 @@ URI protocol for facilitating signing of EOSIO transactions.
 
 ```
 {
-    callback: 'https://dapp.greymass.com',
     actions: [{
         account: 'eosio.token',
         name: 'transfer',
-        authorization: [{ actor: 'teamgreymass', permission: 'active' }],
+        authorization: [{ actor: '............1', permission: '............1' }],
         data: {
             from: 'teamgreymass',
             to: 'dapp',
@@ -28,25 +26,33 @@ URI protocol for facilitating signing of EOSIO transactions.
 **URI Generated**
 
 ```
-eosio:23NcfRWj7pN3ea4b58SDtkHKMnPNccjPcmPnRgK4psydL5gYLrVbAvpe2J5KbJTA9kVeqfTxPx29ykwJKZLo3o1phYrxwCqjUBotHGwFAiFUm7wyCNjV2TMVy
+esr://23NcfRWj7pN3ea4b58SDtkHKMnPNccjPcmPnRgK4psydL5gYLrVbAvpe2J5KbJTA9kVeqfTxPx29ykwJKZLo3o1phYrxwCqjUBotHGwFAiFUm7wyCNjV2TMVy
 ```
 
 ### Example Code
 
 ```
+const { JsonRpc, Api } = require('eosjs')
+
+const fetch = require('node-fetch')
 const util = require('util')
 const zlib = require('zlib')
-const eosjs = require('eosjs')
-
-const { SigningRequest } = require("eosio-uri")
 
 const textEncoder = new util.TextEncoder()
 const textDecoder = new util.TextDecoder()
 
-// create an instances of eosjs for rpc calls
-const rpc = Eos({
-    httpEndpoint: 'https://eos.greymass.com'
-});
+const rpc = new JsonRpc('https://eos.greymass.com', {
+    // only needed if running in nodejs
+    fetch
+})
+const eos = new Api({
+    rpc,
+    textDecoder,
+    textEncoder,
+})
+
+// const { SigningRequest } = require("eosio-signing-request")
+const { SigningRequest } = require(".")
 
 // opts for the signing request
 const opts = {
@@ -65,9 +71,7 @@ const opts = {
     },
     // provider to retrieve contract abi
     abiProvider: {
-        getAbi: async (account) => {
-            return (await rpc.get_abi(account)).abi
-        }
+        getAbi: async (account) => (await eos.getAbi(account))
     }
 }
 
@@ -83,12 +87,13 @@ async function main() {
           - broadcast: boolean, whether or not to broadcast this transaction after signing
           - callback: string|object | either a URL callback or object ({url: string, background: boolean})
     */
-    let req = await SigningRequest.create({
-        callback: 'https://dapp.greymass.com',
+
+    const req = await SigningRequest.create({
         actions: [{
             account: 'eosio.token',
             name: 'transfer',
-            authorization: [{ actor: 'teamgreymass', permission: 'active' }],
+            // '............1' = placeholder for signer
+            authorization: [{ actor: '............1', permission: '............1' }],
             data: {
                 from: 'teamgreymass',
                 to: 'dapp',
@@ -98,16 +103,31 @@ async function main() {
         }]
     }, opts)
 
+
     // encode signing request as string
-    let uri = req.encode()
+    const uri = req.encode();
     console.log(`URI: ${ uri }`)
 
     // reinterpret from encoded string
-    req = SigningRequest.from(uri, opts)
-    console.log(`Actions\n${ util.inspect(await req.getActions()) }`)
-    console.log(`Transaction\n${ util.inspect(req.getTransaction()) }`)
-    console.log(`Callback\n${ util.inspect(req.getCallback()) }`)
+    const decoded = SigningRequest.from(uri, opts)
+    console.log(`\nDecoded Signing Request\n\n${ util.inspect(decoded, false, null, true) }`)
+
+    // Get reference block material
+    const head = (await rpc.get_info(true)).head_block_num;
+    const block = await rpc.get_block(head);
+    // Fetch the ABIs needed to decode
+    const abis = await decoded.fetchAbis();
+    // Resolve the transaction as a specific user
+    const authorization = {
+        actor: 'teamgreymass',
+        permission: 'active',
+    }
+    const resolved = decoded.resolve(abis, authorization, block);
+
+    console.log(`\n\nResolved Signing Request\n\n${ util.inspect(resolved.request, false, null, true) }`)
+    console.log(`\n\nResolved Transaction\n\n${ util.inspect(resolved.transaction, false, null, true) }`)
 }
 
 main().catch(console.error)
+
 ```
