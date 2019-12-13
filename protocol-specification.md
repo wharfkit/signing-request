@@ -1,10 +1,10 @@
 # EOSIO URI Protocol Specification
 
-The `eosio://` URI protocol uses the same binary format as the EOSIO blockchain, encoded using an url-safe Base64 variant ([Base64u](#base64u)).
+The `esr://` URI protocol uses the same binary format as the EOSIO blockchain, encoded using an url-safe Base64 variant ([Base64u](#base64u)).
 
 ### Example
 
-The URI `eosio://gWNgZGBY1mTC_MoglIGBIVzX5uxZRqAQGMBoQxgDAjRiF2SwgVksrv7BIFqgOCOxKFUhMS9FITUvK79SkZEBAA` decodes to:
+The URI `esr://gWNgZGBY1mTC_MoglIGBIVzX5uxZRqAQGMBoQxgDAjRiF2SwgVksrv7BIFqgOCOxKFUhMS9FITUvK79SkZEBAA` decodes to:
 
 ```json
 {
@@ -64,7 +64,7 @@ Which when resolved using the `bar@active` permission and TAPoS values of
 
 ## Request data
 
-The request data is the Base64-decoded `eosio://` payload and consists of a 1-byte header and the EOSIO encoded request struct.
+The request data is the Base64-decoded `esr://` payload and consists of a 1-byte header and the EOSIO encoded request struct.
 
 ```
 header  request
@@ -295,9 +295,9 @@ If the compression bit is set in the header the signing request data is compress
 
 Using compression is recommended since it generates much shorter URIs (and smaller QR codes) but left optional since when used in a contract bandwidth is often cheaper than CPU time.
 
-Compressed: `eosio://gWNgZGBY1mTC_MoglIGBIVzX5uxZRqAQGMBoQxgDAjRiF2SwgVksrv7BIFqgOCOxKFUhMS9FITUvK79SkZEBAA`
+Compressed: `esr://gWNgZGBY1mTC_MoglIGBIVzX5uxZRqAQGMBoQxgDAjRiF2SwgVksrv7BIFqgOCOxKFUhMS9FITUvK79SkZEBAA`
 
-Uncompressed: `eosio://AQABAACmgjQD6jBVAAAAVy08zc0BAQAAAAAAAAABAAAAAAAAADEBAAAAAAAAAAAAAAAAAChdoGgGAAAAAAAERU9TAAAAABBzaGFyZSBhbmQgZW5qb3khAQA`
+Uncompressed: `esr://AQABAACmgjQD6jBVAAAAVy08zc0BAQAAAAAAAAABAAAAAAAAADEBAAAAAAAAAAAAAAAAAChdoGgGAAAAAAAERU9TAAAAABBzaGFyZSBhbmQgZW5qb3khAQA`
 
 ## Callbacks
 
