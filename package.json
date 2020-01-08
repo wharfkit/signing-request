@@ -1,6 +1,6 @@
 {
   "name": "eosio-signing-request",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "`esr:` uri encoder and decoder",
   "license": "MIT",
   "main": "./lib/index",
