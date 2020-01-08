@@ -1,133 +1,333 @@
-eosio-signing-request (rev.2)
-=========
+# eosio-signing-request (ESR - Revision 2)
+![version](https://badgen.net/npm/v/eosio-signing-request?style=for-the-badge)
+![license](https://badgen.net/npm/license/eosio-signing-request?style=for-the-badge)
+![downloads](https://badgen.net/npm/dw/eosio-signing-request?style=for-the-badge)
 
-Signing protocol to facilitate the signing of EOSIO transactions.
+A library to assist with the EOSIO Signing Request (ESR) protocol.
+The full specification for ESR is available here:
 
-### Example Data
+https://github.com/eosio-eps/EEPs/blob/master/EEPS/eep-7.md
 
-**Sample Data**
+The ESR protocol allows for an application (dapp) to generate signature requests (transactions) which can then be passed to signers (wallets) for signature creation. These signature requests can be used within URI links, QR Codes, or other transports between applications and signers.
+
+---
+
+## Installation
+
+To add eosio-signing-request to your project, install via the package manager of your choice:
+
+#### NPM
+
+```npm install eosio-signing-request```
+
+#### Yarn
+
+```yarn add eosio-signing-request```
+
+---
+
+## Signing Request Flow
+
+In an environment where an ***application/dapp*** is requesting that an end user perform a transaction within their preferred ***signer/wallet***, each of these applications will utilize the `eosio-signing-request` library to fulfill different roles.
+
+- The ***application/dapp*** will be creating and encoding the signing request.
+- The ***signer/wallet*** will be decoding and resolving the signing request.
+
+The specification itself then allows either the ***signer/wallet*** itself to broadcast the finalized transaction, or the transaction/signature themselves can be passed back to the ***application/dapp*** to broadcast.
+
+The `eosio-signing-request` library is not responsible for transporting this information between the ***application/dapp***
+and ***signer/wallet***, and so this topic will not be covered in this README.
+
+---
+
+## Usage Examples
+
+These examples will use nodejs to create and manipulate a signing request, which can then be sent to any compatible signer for signature creation and ultimately sent to an EOSIO blockchain.
+
+The code within this README will show partial snippets of the process, with full working examples located here:
+
+https://github.com/greymass/eosio-signing-request-demo
+
+#### Sample Transaction/Actions
+
+To create a signing request, the first piece of data we need is either an EOSIO transaction or action(s). For all examples in this README we will use the `eosio:voteproducer` action to set a proxy of `greymassvote`.
+
+The actions are as follows:
 
 ```
-{
-    actions: [{
-        account: 'eosio.token',
-        name: 'transfer',
-        authorization: [{ actor: '............1', permission: '............1' }],
-        data: {
-            from: 'teamgreymass',
-            to: 'dapp',
-            quantity: '42.0000 EOS',
-            memo: 'share and enjoy!',
-        }
-    }]
-}
+const actions = [{
+    account: 'eosio',
+    name: 'voteproducer',
+    authorization: [{
+      actor: '............1',
+      permission: '............2'
+    }],
+    data: {
+        voter: '............1',
+        proxy: 'greymassvote',
+        producers: [],
+    }
+}]
 ```
 
-**URI Generated**
+Two things to note:
+
+1. The `actor` and `voter` fields contain a placeholder which resolves to the signers account name (`............1`).
+2. The `permission` fields contain a placeholder which resolves to the signers account permission (`............2`).
+
+These are optional parameters that can be passed anywhere within the `authorization` or `data` fields. If the application already knows who the end user is, the application can bypass the use of placeholders and specify that data directly.
+
+#### Signing Request Options
+
+Many of the `SigningRequest` method calls below will reference an `opts` parameter, which is a set of options that tell the signing request how to perform various tasks. For these examples, we will be using the following `opts` value.
 
 ```
-esr://23NcfRWj7pN3ea4b58SDtkHKMnPNccjPcmPnRgK4psydL5gYLrVbAvpe2J5KbJTA9kVeqfTxPx29ykwJKZLo3o1phYrxwCqjUBotHGwFAiFUm7wyCNjV2TMVy
-```
-
-### Example Code
-
-```
-const { JsonRpc, Api } = require('eosjs')
-
-const fetch = require('node-fetch')
-const util = require('util')
-const zlib = require('zlib')
-
-const textEncoder = new util.TextEncoder()
-const textDecoder = new util.TextDecoder()
-
-const rpc = new JsonRpc('https://eos.greymass.com', {
-    // only needed if running in nodejs
-    fetch
-})
-const eos = new Api({
-    rpc,
-    textDecoder,
-    textEncoder,
-})
-
-// const { SigningRequest } = require("eosio-signing-request")
-const { SigningRequest } = require(".")
-
-// opts for the signing request
 const opts = {
     // string encoder
     textEncoder,
     // string decoder
     textDecoder,
-    // string compression
+    // zlib string compression (optional, recommended)
     zlib: {
-        deflateRaw: (data) => {
-            return new Uint8Array(zlib.deflateRawSync(Buffer.from(data)))
-        },
-        inflateRaw: (data) => {
-            return new Uint8Array(zlib.inflateRawSync(Buffer.from(data)))
-        },
+        deflateRaw: (data) => new Uint8Array(zlib.deflateRawSync(Buffer.from(data))),
+        inflateRaw: (data) => new Uint8Array(zlib.inflateRawSync(Buffer.from(data))),
     },
-    // provider to retrieve contract abi
+    // Customizable ABI Provider used to retrieve contract data
     abiProvider: {
         getAbi: async (account) => (await eos.getAbi(account))
     }
 }
+```
 
-async function main() {
-    /*
-      creating a signing request
+### Creating a Signing Request
 
-      parameters (all optional):
-          - action: object, single action
-          - actions: array, multiple actions
-          - transaction: object, whole transaction
-          - chainId: string, either the chainId or a named string (predefined, EOS|TELOS)
-          - broadcast: boolean, whether or not to broadcast this transaction after signing
-          - callback: string|object | either a URL callback or object ({url: string, background: boolean})
-    */
-
-    const req = await SigningRequest.create({
-        actions: [{
-            account: 'eosio.token',
-            name: 'transfer',
-            // '............1' = placeholder for signer
-            authorization: [{ actor: '............1', permission: '............1' }],
-            data: {
-                from: 'teamgreymass',
-                to: 'dapp',
-                quantity: '42.0000 EOS',
-                memo: 'share and enjoy!',
-            }
-        }]
-    }, opts)
-
-
-    // encode signing request as string
-    const uri = req.encode();
-    console.log(`URI: ${ uri }`)
-
-    // reinterpret from encoded string
-    const decoded = SigningRequest.from(uri, opts)
-    console.log(`\nDecoded Signing Request\n\n${ util.inspect(decoded, false, null, true) }`)
-
-    // Get reference block material
-    const head = (await rpc.get_info(true)).head_block_num;
-    const block = await rpc.get_block(head);
-    // Fetch the ABIs needed to decode
-    const abis = await decoded.fetchAbis();
-    // Resolve the transaction as a specific user
-    const authorization = {
-        actor: 'teamgreymass',
-        permission: 'active',
-    }
-    const resolved = decoded.resolve(abis, authorization, block);
-
-    console.log(`\n\nResolved Signing Request\n\n${ util.inspect(resolved.request, false, null, true) }`)
-    console.log(`\n\nResolved Transaction\n\n${ util.inspect(resolved.transaction, false, null, true) }`)
-}
-
-main().catch(console.error)
+With the above actions established, to create the signing request itself we use the eosio-signing-request library and its `create` method. The full working example to create this request [can be found here](https://github.com/greymass/eosio-signing-request-demo/blob/master/examples/encode.js).
 
 ```
+const request = await SigningRequest.create({ actions }, opts)
+```
+
+This call will return an instance of a `SigningRequest`
+
+```
+SigningRequest {
+  version: 2,
+  data: {
+    req: [
+      'action[]',
+      [
+        {
+          account: 'eosio',
+          name: 'voteproducer',
+          authorization: [ { actor: '............1', permission: '............2' } ],
+          data: '0100000000000000A032DD181BE9D56500'
+        }
+      ]
+    ],
+    chain_id: [ 'chain_alias', 1 ],
+    flags: 1,
+    callback: '',
+    info: []
+  },
+  textEncoder: TextEncoder { encoding: 'utf-8' },
+  textDecoder: TextDecoder { encoding: 'utf-8', fatal: false, ignoreBOM: false },
+  zlib: {
+    deflateRaw: [Function: deflateRaw],
+    inflateRaw: [Function: inflateRaw]
+  },
+  abiProvider: { getAbi: [AsyncFunction: getAbi] },
+  signature: undefined
+}
+```
+
+### Encoding a Signing Request
+
+With an instance of a `SigningRequest` available, we can now call the `encode` method on it in order to generate a compressed payload to transport to a signing application.
+
+```
+const encoded = request.encode()
+```
+
+This `encoded` variable will now contain a string we can either pass directly to the signer via URI, QRCode or any other method.  The string itself is:
+
+```
+esr://gmNgZGRkAIFXBqEFopc6760yugsVYWBggtKCMIEFRnclpF9eTWUACgAA
+```
+
+These encoded strings can be shared and viewed by a number of applications, including:
+
+**EOSIO.to**
+
+This website is a utility which allows the viewing of a signing request as well as the opportunity to create a signature for it.  The above encoded request can be passed to the eosio.to domain:
+
+https://eosio.to/gmNgZGRkAIFXBqEFopc6760yugsVYWBggtKCMIEFRnclpF9eTWUACgAA
+
+**EOSIO URI Builder**
+
+This web application allows for the viewing, editing, and customization of signing requests. The above encoded request can be passed to the builder via a URL parameter:
+
+https://greymass.github.io/eosio-uri-builder/gmNgZGRkAIFXBqEFopc6760yugsVYWBggtKCMIEFRnclpF9eTWUACgAA
+
+### Decoding a Signing Request
+
+Using the encoded signing request generated in the example above:
+
+```
+const uri = 'esr://gmNgZGRkAIFXBqEFopc6760yugsVYWBggtKCMIEFRnclpF9eTWUACgAA'
+```
+
+Another application can now decode this request into an instance of a `SigningRequest` with the `from` method. The full working example for [decoding can be found here](https://github.com/greymass/eosio-signing-request-demo/blob/master/examples/decode.js).
+
+```
+const decoded = SigningRequest.from(uri, opts)
+```
+
+Decoding the signing request will return the same instance as when it was originally created, as follows:
+
+```
+SigningRequest {
+  version: 2,
+  data: {
+    chain_id: [ 'chain_alias', 1 ],
+    req: [
+      'action[]',
+      [
+        {
+          account: 'eosio',
+          name: 'voteproducer',
+          authorization: [ { actor: '............1', permission: '............2' } ],
+          data: '0100000000000000A032DD181BE9D56500'
+        }
+      ]
+    ],
+    flags: 1,
+    callback: '',
+    info: []
+  },
+  textEncoder: TextEncoder { encoding: 'utf-8' },
+  textDecoder: TextDecoder { encoding: 'utf-8', fatal: false, ignoreBOM: false },
+  zlib: {
+    deflateRaw: [Function: deflateRaw],
+    inflateRaw: [Function: inflateRaw]
+  },
+  abiProvider: { getAbi: [AsyncFunction: getAbi] },
+  signature: undefined
+}
+```
+
+This `SigningRequest` can then be used within signing applications to start interacting with the request itself.
+
+### Resolving a Signing Request
+
+With an instance of a `SigningRequest` available, a signing application can now resolve the specific request into a transaction. The resolving step does a few things:
+
+- Generates a transaction with valid TAPOS values.
+- Templates the transaction, removing any placeholders and resolving it to be used by a specific end user.
+- Serializes the transaction for use within the signer.
+
+This step now requires that the application understand who the user is, and have access to the blockchain itself to retrieve TAPOS values. The full example of the code below to [resolve a signing request can be found here](https://github.com/greymass/eosio-signing-request-demo/blob/master/examples/resolve.js).
+
+```
+// An encoded eosio:voteproducer transaction
+const uri = 'esr://gmNgZGRkAIFXBqEFopc6760yugsVYWBggtKCMIEFRnclpF9eTWUACgAA'
+
+// Decode the URI
+const decoded = SigningRequest.from(uri, opts)
+
+// In order to resolve the transaction, we need a recent block
+const head = (await rpc.get_info(true)).head_block_num;
+const block = await rpc.get_block(head);
+
+// Fetch the ABIs needed for decoding
+const abis = await decoded.fetchAbis();
+
+// An authorization to resolve the transaction to
+const authorization = {
+    actor: 'teamgreymass',
+    permission: 'active',
+}
+
+// Resolve the transaction as a specific user
+const resolved = await decoded.resolve(abis, authorization, block);
+```
+
+The `resolve` method will return an instance of a `ResolvedSigningRequest`, which contains:
+
+- The original `SigningRequest` as `request`.
+- The `signer` that was used to template the transaction.
+- The `transaction` which has been templated and is ready to use.
+- The transaction already serialized as `serializedTransaction`.
+
+Below is the representation of an instance of this object.
+
+```
+ResolvedSigningRequest {
+  request: SigningRequest {
+    version: 2,
+    data: {
+      chain_id: [ 'chain_alias', 1 ],
+      req: [
+        'action[]',
+        [
+          {
+            account: 'eosio',
+            name: 'voteproducer',
+            authorization: [ { actor: '............1', permission: '............2' } ],
+            data: '0100000000000000A032DD181BE9D56500'
+          }
+        ]
+      ],
+      flags: 1,
+      callback: '',
+      info: []
+    },
+    textEncoder: TextEncoder { encoding: 'utf-8' },
+    textDecoder: TextDecoder { encoding: 'utf-8', fatal: false, ignoreBOM: false },
+    zlib: {
+      deflateRaw: [Function: deflateRaw],
+      inflateRaw: [Function: inflateRaw]
+    },
+    abiProvider: { getAbi: [AsyncFunction: getAbi] },
+    signature: undefined
+  },
+  signer: { actor: 'teamgreymass', permission: 'active' },
+  transaction: {
+    actions: [
+      {
+        account: 'eosio',
+        name: 'voteproducer',
+        authorization: [ { actor: 'teamgreymass', permission: 'active' } ],
+        data: { voter: 'teamgreymass', proxy: 'greymassvote', producers: [] }
+      }
+    ],
+    context_free_actions: [],
+    transaction_extensions: [],
+    expiration: '2020-01-08T18:44:57.000',
+    ref_block_num: 1423,
+    ref_block_prefix: 4278398322,
+    max_cpu_usage_ms: 0,
+    max_net_usage_words: 0,
+    delay_sec: 0
+  },
+  serializedTransaction: Uint8Array [
+    41,  35,  22,  94, 143,  5, 114,  45,   3, 255,   0,   0,
+     0,   0,   1,   0,   0,  0,   0,   0, 234,  48,  85, 112,
+    21, 210, 137, 222, 170, 50, 221,   1, 128, 177, 145,  94,
+    93,  38, 141, 202,   0,  0,   0,   0, 168, 237,  50,  50,
+    17, 128, 177, 145,  94, 93,  38, 141, 202, 160,  50, 221,
+    24,  27, 233, 213, 101,  0,   0
+  ]
+}
+```
+
+The `transaction` or `serializedTransaction` can now be used within any signature provider to generate a signature for this transaction, and ultimately broadcast the signed transaction to the blockchain.
+
+### Further Usage
+
+This README will be updated further to provide more usage as time progresses. The library itself already supports sessions, identities, callbacks, signature generation, and more. It will just take time to properly document every use case.
+
+### Developer Chat
+
+We have a telegram channel dedicated to the development of this protocol which you can find here:
+
+https://t.me/eosio_signing_request
