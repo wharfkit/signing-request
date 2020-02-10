@@ -815,6 +815,7 @@ export class SigningRequest {
                 return req[1]
             case 'identity':
                 let data: string = '0101000000000000000200000000000000' // placeholder permission
+                let authorization: abi.PermissionLevel[] = [PlaceholderAuth]
                 if (req[1].permission) {
                     let buf = new Serialize.SerialBuffer({
                         textDecoder: this.textDecoder,
@@ -822,12 +823,13 @@ export class SigningRequest {
                     })
                     SigningRequest.idType.serialize(buf, req[1])
                     data = Serialize.arrayToHex(buf.asUint8Array())
+                    authorization = [req[1].permission]
                 }
                 return [
                     {
                         account: '',
                         name: 'identity',
-                        authorization: [],
+                        authorization,
                         data,
                     },
                 ]

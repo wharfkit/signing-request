@@ -318,7 +318,10 @@ describe('signing request', function() {
                 {
                     account: '',
                     name: 'identity',
-                    authorization: [],
+                    authorization: [{
+                        actor: 'foo',
+                        permission: 'bar',
+                    }],
                     data: {
                         permission: {
                             actor: 'foo',
@@ -410,7 +413,10 @@ describe('signing request', function() {
                 {
                     account: '',
                     name: 'identity',
-                    authorization: [],
+                    authorization: [{
+                        actor: 'foo',
+                        permission: 'bar',
+                    }],
                     data: {
                         permission: {
                             actor: 'foo',
