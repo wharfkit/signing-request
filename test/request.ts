@@ -318,10 +318,12 @@ describe('signing request', function() {
                 {
                     account: '',
                     name: 'identity',
-                    authorization: [{
-                        actor: 'foo',
-                        permission: 'bar',
-                    }],
+                    authorization: [
+                        {
+                            actor: 'foo',
+                            permission: 'bar',
+                        },
+                    ],
                     data: {
                         permission: {
                             actor: 'foo',
@@ -413,10 +415,12 @@ describe('signing request', function() {
                 {
                     account: '',
                     name: 'identity',
-                    authorization: [{
-                        actor: 'foo',
-                        permission: 'bar',
-                    }],
+                    authorization: [
+                        {
+                            actor: 'foo',
+                            permission: 'bar',
+                        },
+                    ],
                     data: {
                         permission: {
                             actor: 'foo',
