@@ -923,6 +923,47 @@ export class SigningRequest {
         return rv
     }
 
+    /** Set a metadata key. */
+    public setInfoKey(key: string, value: string | boolean) {
+        let pair = this.data.info.find((pair) => {
+            return pair.key === key
+        })
+        let encodedValue: Uint8Array
+        switch (typeof value) {
+            case 'string':
+                encodedValue = this.textEncoder.encode(value)
+                break
+            case 'boolean':
+                encodedValue = new Uint8Array([value ? 1 : 0])
+                break
+            default:
+                throw new TypeError('Invalid value type, expected string or boolean.')
+        }
+        if (!pair) {
+            pair = {key, value: encodedValue}
+            this.data.info.push(pair)
+        } else {
+            pair.value = encodedValue
+        }
+    }
+
+    /** Return a deep copy of this request. */
+    public clone(): SigningRequest {
+        let signature: abi.RequestSignature | undefined
+        if (this.signature) {
+            signature = JSON.parse(JSON.stringify(this.signature))
+        }
+        return new SigningRequest(
+            this.version,
+            JSON.parse(JSON.stringify(this.data)),
+            this.textEncoder,
+            this.textDecoder,
+            this.zlib,
+            this.abiProvider,
+            signature
+        )
+    }
+
     // Convenience methods.
 
     public toString() {

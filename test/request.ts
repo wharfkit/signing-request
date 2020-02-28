@@ -455,4 +455,26 @@ describe('signing request', function() {
         assert.deepStrictEqual(decoded.getInfo(), req.getInfo())
         assert.deepStrictEqual(decoded.getInfo(), {foo: 'bar', baz: '\u0000\u0001\u0002'})
     })
+
+    it('should deep clone', async function() {
+        const request = await SigningRequest.create(
+            {
+                action: {
+                    account: 'eosio.token',
+                    name: 'transfer',
+                    authorization: [{actor: 'foo', permission: 'active'}],
+                    data: {from: 'foo', to: 'bar', quantity: '1.000 EOS', memo: ''},
+                },
+            },
+            options
+        )
+        const copy = request.clone()
+
+        assert.deepStrictEqual(request.data, copy.data)
+        assert.deepStrictEqual(request.encode(), copy.encode())
+
+        copy.setInfoKey('foo', true)
+        assert.notDeepStrictEqual(request.data, copy.data)
+        assert.notDeepStrictEqual(request.encode(), copy.encode())
+    })
 })
