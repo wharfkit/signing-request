@@ -953,9 +953,15 @@ export class SigningRequest {
         if (this.signature) {
             signature = JSON.parse(JSON.stringify(this.signature))
         }
+        const data = JSON.stringify(this.data, (key, value) => {
+            if (value instanceof Uint8Array) {
+                return Array.from(value)
+            }
+            return value
+        })
         return new SigningRequest(
             this.version,
-            JSON.parse(JSON.stringify(this.data)),
+            JSON.parse(data),
             this.textEncoder,
             this.textDecoder,
             this.zlib,
