@@ -626,13 +626,10 @@ export class SigningRequest {
 
     /** ABI definitions required to resolve request. */
     public getRequiredAbis() {
-        return [
-            ...new Set(
-                this.getRawActions()
-                    .filter((action) => !isIdentity(action))
-                    .map((action) => action.account)
-            ),
-        ]
+        return this.getRawActions()
+            .filter((action) => !isIdentity(action))
+            .map((action) => action.account)
+            .filter((value, index, self) => self.indexOf(value) === index)
     }
 
     /** Whether TaPoS values are required to resolve request. */
