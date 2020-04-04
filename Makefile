@@ -13,7 +13,7 @@ lint: node_modules
 
 .PHONY: test
 test: node_modules
-	mocha --require ts-node/register test/*.ts --grep '$(grep)'
+	NODE_ENV=test TS_NODE_PROJECT=./test/tsconfig.json ./node_modules/.bin/mocha --require ts-node/register --extensions ts test/*.ts --grep '$(grep)'
 
 node_modules:
 	yarn install --non-interactive --frozen-lockfile
