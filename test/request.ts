@@ -1,16 +1,20 @@
 import * as assert from 'assert'
 import 'mocha'
 import {TextDecoder, TextEncoder} from 'util'
-import {
-    PlaceholderAuth,
-    PlaceholderName,
-    SignatureProvider,
-    SigningRequest,
-    SigningRequestEncodingOptions,
-} from '../src'
+
 import abiProvider from './utils/mock-abi-provider'
 import mockAbiProvider from './utils/mock-abi-provider'
 import zlib from './utils/node-zlib-provider'
+
+import {SignatureProvider, SigningRequestEncodingOptions} from '../src'
+import * as TSModule from '../src'
+
+let {SigningRequest, PlaceholderAuth, PlaceholderName} = TSModule
+if (process.env['TEST_UMD']) {
+    const UMDModule = require('./../lib/index.umd')
+    SigningRequest = UMDModule.SigningRequest
+    console.log(' -- TESTING UMD BUNDLE -- ')
+}
 
 const options: SigningRequestEncodingOptions = {
     abiProvider,
