@@ -254,7 +254,11 @@ export class SigningRequest {
         } else if (args.action && !args.actions && !args.transaction) {
             data.req = ['action', await serialize(args.action)]
         } else if (args.actions && !args.action && !args.transaction) {
-            data.req = ['action[]', await Promise.all(args.actions.map(serialize))]
+            if (args.actions.length === 1) {
+                data.req = ['action', await serialize(args.actions[0])]
+            } else {
+                data.req = ['action[]', await Promise.all(args.actions.map(serialize))]
+            }
         } else if (args.transaction && !args.action && !args.actions) {
             const tx = args.transaction
             // set default values if missing
