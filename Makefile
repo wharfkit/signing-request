@@ -1,13 +1,10 @@
-
-SHELL := /bin/bash
-PATH  := ./node_modules/.bin:$(PATH)
-
 SRC_FILES := $(shell find src -name '*.ts')
 
 all: lib
 
 lib: $(SRC_FILES) node_modules tsconfig.json
-	tsc -p tsconfig.json --outDir lib
+	./node_modules/.bin/tsc -p tsconfig.json --outDir lib
+	./node_modules/.bin/microbundle --format umd --globals fast-sha256=sha256
 	touch lib
 
 .PHONY: lint

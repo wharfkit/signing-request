@@ -2,7 +2,7 @@
   "compilerOptions": {
     "declaration": true,
     "lib": ["esnext", "dom"],
-    "module": "commonjs",
+    "module": "esnext",
     "moduleResolution": "node",
     "outDir": "lib",
     "downlevelIteration": true,
