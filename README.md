@@ -103,8 +103,17 @@ const opts = {
 
 With the above actions established, to create the signing request itself we use the eosio-signing-request library and its `create` method. The full working example to create this request [can be found here](https://github.com/greymass/eosio-signing-request-demo/blob/master/examples/encode.js).
 
+(ES8 or TypeEcript)
 ```
 const request = await SigningRequest.create({ actions }, opts)
+console.log(request)
+```
+
+(ES6)
+```
+SigningRequest.create({ actions }, opts).then((request) => {
+  console.log(request)
+})
 ```
 
 This call will return an instance of a `SigningRequest`
@@ -114,29 +123,19 @@ SigningRequest {
   version: 2,
   data: {
     req: [
-      'action[]',
-      [
-        {
-          account: 'eosio',
-          name: 'voteproducer',
-          authorization: [ { actor: '............1', permission: '............2' } ],
-          data: '0100000000000000A032DD181BE9D56500'
-        }
-      ]
+      'action',
+      {
+        account: 'eosio',
+        name: 'voteproducer',
+        authorization: [ { actor: '............1', permission: '............2' } ],
+        data: '0100000000000000A032DD181BE9D56500'
+      }
     ],
     chain_id: [ 'chain_alias', 1 ],
     flags: 1,
     callback: '',
     info: []
-  },
-  textEncoder: TextEncoder { encoding: 'utf-8' },
-  textDecoder: TextDecoder { encoding: 'utf-8', fatal: false, ignoreBOM: false },
-  zlib: {
-    deflateRaw: [Function: deflateRaw],
-    inflateRaw: [Function: inflateRaw]
-  },
-  abiProvider: { getAbi: [AsyncFunction: getAbi] },
-  signature: undefined
+  }
 }
 ```
 
