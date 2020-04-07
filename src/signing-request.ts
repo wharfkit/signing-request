@@ -114,6 +114,11 @@ export enum ChainName {
     MEETONE = 7,
     INSIGHTS = 8,
     BEOS = 9,
+    WAX = 10,
+    WAXTESTNET = 11,
+    FIO = 12,
+    FIOTESTNET = 13,
+    TELOSTESTNET = 14,
 }
 
 const ChainIdLookup = new Map<abi.ChainAlias, abi.ChainId>([
@@ -126,6 +131,11 @@ const ChainIdLookup = new Map<abi.ChainAlias, abi.ChainId>([
     [ChainName.MEETONE, 'cfe6486a83bad4962f232d48003b1824ab5665c36778141034d75e57b956e422'],
     [ChainName.INSIGHTS, 'b042025541e25a472bffde2d62edd457b7e70cee943412b1ea0f044f88591664'],
     [ChainName.BEOS, 'b912d19a6abd2b1b05611ae5be473355d64d95aeff0c09bedc8c166cd6468fe4'],
+    [ChainName.WAX, '1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4'],
+    [ChainName.WAXTESTNET, 'f16b1833c747c43682f4386fca9cbb327929334a762755ebec17f6f23c9b8a12'],
+    [ChainName.FIO, '21dcae42c0182200e93f954a074011f9048a7624c6fe81d3c9541a614a88bd1c'],
+    [ChainName.FIOTESTNET, 'b20901380af44ef59c5918439a1f9a41d83669020319a80574b804a5f95cbd7e'],
+    [ChainName.TELOSTESTNET, '1eaa0824707c8c16bd25145493bf062aecddfeb56c736f6ba6397f3195f33c9f'],
 ])
 
 /**
