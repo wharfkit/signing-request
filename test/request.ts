@@ -481,4 +481,24 @@ describe('signing request', function() {
         assert.notDeepStrictEqual(request.data, copy.data)
         assert.notDeepStrictEqual(request.encode(), copy.encode())
     })
+
+    it('should resolve templated callback urls', async function () {
+        const req1uri =
+            'esr://gmNgZGBY1mTC_MoglIGBIVzX5uxZRqAQGDBBaUWYAARoxMIkGAJDIyAM9YySkoJiK3391IrE3IKcVL3k_Fz7kgrb6uqSitpataQ8ICspr7aWAQA'
+        const req1 = SigningRequest.from(req1uri, options)
+        const abis = await req1.fetchAbis()
+        const resolved = await req1.resolve(
+            abis,
+            { actor: 'foo', permission: 'bar' },
+            {
+                timestamp,
+                block_num: 1234,
+                expire_seconds: 0,
+                ref_block_prefix: 56789,
+            }
+        )
+        const callback = resolved.getCallback(['SIG_K1_KBub1qmdiPpWA2XKKEZEG3EfKJBf38GETHzbd4t3CBdWLgdvFRLCqbcUsBbbYga6jmxfdSFfodMdhMYraKLhEzjSCsiuMs'], 1234)
+        const expected = 'https://example.com?tx=6AFF5C203810FF6B40469FE20318856354889FF037F4CF5B89A157514A43E825&bn=1234'
+        assert.equal(callback!.url, expected)
+    })
 })

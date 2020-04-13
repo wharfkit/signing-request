@@ -1056,7 +1056,7 @@ export class ResolvedSigningRequest {
         if (blockNum) {
             payload.bn = String(blockNum)
         }
-        const url = callback.replace(/({{[a-z0-9]+}})/g, (_1, _2, m) => {
+        const url = callback.replace(/({{([a-z0-9]+)}})/g, (_1, _2, m) => {
             return payload[m] || ''
         })
         return {
