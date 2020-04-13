@@ -406,6 +406,26 @@ describe('signing request', function() {
         assert.strictEqual(req2.encode(), req2uri)
     })
 
+    it('should decode callback requests', async function() {
+        const req1uri =
+            'esr://gmNgZGBY1mTC_MoglIGBIVzX5uxZRqAQGDBBaQeYAEONVx5vR4YNTILByd_fKZiBQd6mOLkos6DELjEntahEQz0jNScnX13TRh8qzCCZUVJSUGylr5-Tn5yYk5FfXKKvXF1dUlFbywAA'
+        const req1 = SigningRequest.from(req1uri, options)
+        const abis = await req1.fetchAbis()
+        const tx = await req1.resolve(
+            abis,
+            {actor: 'foo', permission: 'bar'},
+            {
+                timestamp,
+                block_num: 1234,
+                expire_seconds: 0,
+                ref_block_prefix: 56789,
+            }
+        )
+        const callback = tx.getCallback(['SIG_K1_KBub1qmdiPpWA2XKKEZEG3EfKJBf38GETHzbd4t3CBdWLgdvFRLCqbcUsBbbYga6jmxfdSFfodMdhMYraKLhEzjSCsiuMs'], 1234)
+        const expected = 'https://localhost/#2EAB2861BDCA9C3BE4FA23D9532E2DB7F908F612A819485AD58B1B6FC66D4C1E'
+        assert.equal(callback!.url, expected)
+    })
+
     it('should generate correct identity requests', async function() {
         let reqUri = 'esr://AgABAwACJWh0dHBzOi8vY2guYW5jaG9yLmxpbmsvMTIzNC00NTY3LTg5MDAA'
         let req = SigningRequest.from(reqUri, options)
