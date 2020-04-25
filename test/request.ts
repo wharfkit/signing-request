@@ -460,6 +460,37 @@ describe('signing request', function() {
         assert.deepStrictEqual(decoded.getInfo(), {foo: 'bar', baz: '\u0000\u0001\u0002'})
     })
 
+    it('should template callback url', async function() {
+        const mockSig = 'SIG_K1_K8Wm5AXSQdKYVyYFPCYbMZurcJQXZaSgXoqXAKE6uxR6Jot7otVzS55JGRhixCwNGxaGezrVckDgh88xTsiu4wzzZuP9JE'
+        const mockTx = '308D206C51C5DD6C02E0417E44560CDC2E76DB7765CEA19DFA8F9F94922F928A'
+        const request = await SigningRequest.create(
+            {
+                action: {
+                    account: 'eosio.token',
+                    name: 'transfer',
+                    authorization: [{actor: 'foo', permission: 'active'}],
+                    data: {from: 'foo', to: 'bar', quantity: '1.000 EOS', memo: 'hello there'},
+                },
+                callback: 'https://example.com/?sig={{sig}}&tx={{tx}}'
+            },
+            options
+        )
+        const abis = await request.fetchAbis()
+        const resolved = await request.resolve(
+            abis,
+            {actor: 'foo', permission: 'bar'},
+            {
+                timestamp,
+                block_num: 1234,
+                expire_seconds: 0,
+                ref_block_prefix: 56789,
+            }
+        )
+        const callback:any = resolved.getCallback([mockSig]);
+        const expected = `https://example.com/?sig=${mockSig}&tx=${mockTx}`
+        assert.deepStrictEqual(callback.url, expected)
+    })
+
     it('should deep clone', async function() {
         const request = await SigningRequest.create(
             {
