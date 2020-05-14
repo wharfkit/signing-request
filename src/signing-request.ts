@@ -1110,11 +1110,9 @@ function variantId(chainId?: abi.ChainId | abi.ChainAlias): abi.VariantId {
         return ['chain_alias', chainId]
     } else {
         // resolve known chain id's to their aliases
-        chainId = chainId.toLowerCase()
-        for (const [n, id] of ChainIdLookup) {
-            if (id === chainId) {
-                return ['chain_alias', n]
-            }
+        const name = idToName(chainId)
+        if (name !== ChainName.UNKNOWN) {
+            return ['chain_alias', name]
         }
         return ['chain_id', chainId]
     }
@@ -1129,5 +1127,24 @@ function hasTapos(tx: abi.Transaction) {
         tx.expiration === '1970-01-01T00:00:00.000' &&
         tx.ref_block_num === 0 &&
         tx.ref_block_prefix === 0
+    )
+}
+
+/** Resolve a chain id to a chain name alias, returns UNKNOWN (0x00) if the chain id has no alias. */
+export function idToName(chainId: abi.ChainId): ChainName {
+    chainId = chainId.toLowerCase()
+    for (const [n, id] of ChainIdLookup) {
+        if (id === chainId) {
+            n
+        }
+    }
+    return ChainName.UNKNOWN
+}
+
+/** Resolve a chain name alias to a chain id. */
+export function nameToId(chainName: ChainName): abi.ChainId {
+    return (
+        ChainIdLookup.get(chainName) ||
+        '0000000000000000000000000000000000000000000000000000000000000000'
     )
 }
