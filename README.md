@@ -54,7 +54,7 @@ To create a signing request, the first piece of data we need is either an EOSIO 
 
 The actions are as follows:
 
-```
+```js
 const actions = [{
     account: 'eosio',
     name: 'voteproducer',
@@ -81,7 +81,7 @@ These are optional parameters that can be passed anywhere within the `authorizat
 
 Many of the `SigningRequest` method calls below will reference an `opts` parameter, which is a set of options that tell the signing request how to perform various tasks. For these examples, we will be using the following `opts` value.
 
-```
+```js
 const opts = {
     // string encoder
     textEncoder,
@@ -104,13 +104,13 @@ const opts = {
 With the above actions established, to create the signing request itself we use the eosio-signing-request library and its `create` method. The full working example to create this request [can be found here](https://github.com/greymass/eosio-signing-request-demo/blob/master/examples/encode.js).
 
 (ES8 or TypeEcript)
-```
+```js
 const request = await SigningRequest.create({ actions }, opts)
 console.log(request)
 ```
 
 (ES6)
-```
+```js
 SigningRequest.create({ actions }, opts).then((request) => {
   console.log(request)
 })
@@ -118,7 +118,7 @@ SigningRequest.create({ actions }, opts).then((request) => {
 
 This call will return an instance of a `SigningRequest`
 
-```
+```js
 SigningRequest {
   version: 2,
   data: {
@@ -143,7 +143,7 @@ SigningRequest {
 
 With an instance of a `SigningRequest` available, we can now call the `encode` method on it in order to generate a compressed payload to transport to a signing application.
 
-```
+```js
 const encoded = request.encode()
 ```
 
@@ -171,19 +171,19 @@ https://greymass.github.io/eosio-uri-builder/gmNgZGRkAIFXBqEFopc6760yugsVYWBggtK
 
 Using the encoded signing request generated in the example above:
 
-```
+```js
 const uri = 'esr://gmNgZGRkAIFXBqEFopc6760yugsVYWBggtKCMIEFRnclpF9eTWUACgAA'
 ```
 
 Another application can now decode this request into an instance of a `SigningRequest` with the `from` method. The full working example for [decoding can be found here](https://github.com/greymass/eosio-signing-request-demo/blob/master/examples/decode.js).
 
-```
+```js
 const decoded = SigningRequest.from(uri, opts)
 ```
 
 Decoding the signing request will return the same instance as when it was originally created, as follows:
 
-```
+```js
 SigningRequest {
   version: 2,
   data: {
@@ -226,7 +226,7 @@ With an instance of a `SigningRequest` available, a signing application can now 
 
 This step now requires that the application understand who the user is, and have access to the blockchain itself to retrieve TAPOS values. The full example of the code below to [resolve a signing request can be found here](https://github.com/greymass/eosio-signing-request-demo/blob/master/examples/resolve.js).
 
-```
+```js
 // An encoded eosio:voteproducer transaction
 const uri = 'esr://gmNgZGRkAIFXBqEFopc6760yugsVYWBggtKCMIEFRnclpF9eTWUACgAA'
 
@@ -259,7 +259,7 @@ The `resolve` method will return an instance of a `ResolvedSigningRequest`, whic
 
 Below is the representation of an instance of this object.
 
-```
+```js
 ResolvedSigningRequest {
   request: SigningRequest {
     version: 2,
