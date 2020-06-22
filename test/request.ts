@@ -23,7 +23,7 @@ const options: SigningRequestEncodingOptions = {
     textEncoder: new TextEncoder(),
 }
 
-const timestamp = '2018-02-15T00:00:00.000'
+const timestamp = '2018-02-15T00:00:00.500'
 
 describe('signing request', function() {
     it('should create from action', async function() {
