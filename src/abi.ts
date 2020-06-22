@@ -101,6 +101,7 @@ export const data = {
     ],
     structs: [
         {
+            base: '',
             name: 'permission_level',
             fields: [
                 {
@@ -114,6 +115,7 @@ export const data = {
             ],
         },
         {
+            base: '',
             name: 'action',
             fields: [
                 {
@@ -135,6 +137,7 @@ export const data = {
             ],
         },
         {
+            base: '',
             name: 'extension',
             fields: [
                 {
@@ -148,6 +151,7 @@ export const data = {
             ],
         },
         {
+            base: '',
             name: 'transaction_header',
             fields: [
                 {
@@ -195,6 +199,7 @@ export const data = {
             ],
         },
         {
+            base: '',
             name: 'info_pair',
             fields: [
                 {
@@ -208,6 +213,7 @@ export const data = {
             ],
         },
         {
+            base: '',
             name: 'signing_request',
             fields: [
                 {
@@ -233,6 +239,7 @@ export const data = {
             ],
         },
         {
+            base: '',
             name: 'identity',
             fields: [
                 {
@@ -242,6 +249,7 @@ export const data = {
             ],
         },
         {
+            base: '',
             name: 'request_signature',
             fields: [
                 {
@@ -269,6 +277,7 @@ export const data = {
         {
             name: 'identity',
             type: 'identity',
+            ricardian_contract: '',
         },
     ],
 }

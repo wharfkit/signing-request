@@ -4,7 +4,7 @@ all: lib
 
 lib: $(SRC_FILES) node_modules tsconfig.json
 	./node_modules/.bin/tsc -p tsconfig.json --outDir lib
-	./node_modules/.bin/microbundle --format umd --globals fast-sha256=sha256
+	./node_modules/.bin/microbundle --format umd --external eosjs,crypto --no-compress
 	touch lib
 
 .PHONY: lint

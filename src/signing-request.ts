@@ -2,15 +2,12 @@
  * EOSIO Signing Request (ESR).
  */
 
-import {Serialize} from 'eosjs'
-import sha256 from 'fast-sha256'
+import {Serializer, ABI, ChecksumType, Checksum256, BytesType, Bytes} from 'eosio-core'
 
 import * as abi from './abi'
 import * as base64u from './base64u'
 
 const ProtocolVersion = 2
-
-const AbiTypes = Serialize.getTypesFromAbi(Serialize.createInitialTypes(), abi.data as any)
 
 /** Interface that should be implemented by abi providers. */
 export interface AbiProvider {
@@ -237,9 +234,7 @@ export interface SigningRequestEncodingOptions {
 export type AbiMap = Map<string, any>
 
 export class SigningRequest {
-    public static type = AbiTypes.get('signing_request')!
-    public static idType = AbiTypes.get('identity')!
-    public static transactionType = AbiTypes.get('transaction')!
+    public static abi = ABI.from(abi.data)
 
     /** Create a new signing request. */
     public static async create(
@@ -388,16 +383,14 @@ export class SigningRequest {
      * @param options Creation options.
      */
     public static fromTransaction(
-        chainId: Uint8Array | string,
-        serializedTransaction: Uint8Array | string,
+        chainId: ChecksumType,
+        serializedTransaction: BytesType,
         options: SigningRequestEncodingOptions = {}
     ) {
-        if (typeof chainId !== 'string') {
-            chainId = Serialize.arrayToHex(chainId)
-        }
-        if (typeof serializedTransaction === 'string') {
-            serializedTransaction = Serialize.hexToUint8Array(serializedTransaction)
-        }
+
+        chainId = Checksum256.from(chainId)        
+        serializedTransaction = Bytes.from(serializedTransaction)
+        
         let buf = new Serialize.SerialBuffer({
             textDecoder: options.textDecoder,
             textEncoder: options.textEncoder,
