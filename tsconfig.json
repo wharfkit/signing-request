@@ -7,6 +7,8 @@
     "outDir": "lib",
     "downlevelIteration": true,
     "target": "esnext",
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
     "strict": true,
   },
   "include": [

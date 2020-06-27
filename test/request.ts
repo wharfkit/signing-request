@@ -23,7 +23,7 @@ const options: SigningRequestEncodingOptions = {
     textEncoder: new TextEncoder(),
 }
 
-const timestamp = '2018-02-15T00:00:00.000'
+const timestamp = '2018-02-15T00:00:00'
 
 describe('signing request', function() {
     it('should create from action', async function() {
@@ -38,7 +38,7 @@ describe('signing request', function() {
             },
             options
         )
-        assert.deepStrictEqual(request.data, {
+        assert.deepStrictEqual(recode(request.data), {
             chain_id: ['chain_alias', 1],
             req: [
                 'action',
@@ -47,7 +47,7 @@ describe('signing request', function() {
                     name: 'transfer',
                     authorization: [{actor: 'foo', permission: 'active'}],
                     data:
-                        '000000000000285D000000000000AE39E80300000000000003454F53000000000B68656C6C6F207468657265',
+                        '000000000000285d000000000000ae39e80300000000000003454f53000000000b68656c6c6f207468657265',
                 },
             ],
             callback: '',
@@ -80,7 +80,7 @@ describe('signing request', function() {
             },
             options
         )
-        assert.deepStrictEqual(request.data, {
+        assert.deepStrictEqual(recode(request.data), {
             chain_id: ['chain_alias', 1],
             req: [
                 'action[]',
@@ -90,14 +90,14 @@ describe('signing request', function() {
                         name: 'transfer',
                         authorization: [{actor: 'foo', permission: 'active'}],
                         data:
-                            '000000000000285D000000000000AE39E80300000000000003454F53000000000B68656C6C6F207468657265',
+                            '000000000000285d000000000000ae39e80300000000000003454f53000000000b68656c6c6f207468657265',
                     },
                     {
                         account: 'eosio.token',
                         name: 'transfer',
                         authorization: [{actor: 'baz', permission: 'active'}],
                         data:
-                            '000000000000BE39000000000000AE39E80300000000000003454F53000000000B68656C6C6F207468657265',
+                            '000000000000be39000000000000ae39e80300000000000003454f53000000000b68656c6c6f207468657265',
                     },
                 ],
             ],
@@ -129,7 +129,7 @@ describe('signing request', function() {
             },
             options
         )
-        assert.deepStrictEqual(request.data, {
+        assert.deepStrictEqual(recode(request.data), {
             chain_id: ['chain_alias', 1],
             req: [
                 'transaction',
@@ -140,7 +140,7 @@ describe('signing request', function() {
                             name: 'transfer',
                             authorization: [{actor: 'foo', permission: 'active'}],
                             data:
-                                '000000000000285D000000000000AE39E80300000000000003454F53000000000B68656C6C6F207468657265',
+                                '000000000000285d000000000000ae39e80300000000000003454f53000000000b68656c6c6f207468657265',
                         },
                     ],
                     context_free_actions: [],
@@ -164,7 +164,7 @@ describe('signing request', function() {
             'esr://gmNgZGBY1mTC_MoglIGBIVzX5uxZRqAQGMBoExgDAjRi4fwAVz93ICUckpGYl12skJZfpFCSkaqQllmcwczAAAA',
             options
         )
-        assert.deepStrictEqual(request.data, {
+        assert.deepStrictEqual(recode(request.data), {
             chain_id: ['chain_alias', 1],
             req: [
                 'action',
@@ -173,7 +173,7 @@ describe('signing request', function() {
                     name: 'transfer',
                     authorization: [{actor: PlaceholderName, permission: PlaceholderName}],
                     data:
-                        '0100000000000000000000000000285D01000000000000000050454E47000000135468616E6B7320666F72207468652066697368',
+                        '0100000000000000000000000000285d01000000000000000050454e47000000135468616e6b7320666f72207468652066697368',
                 },
             ],
             callback: '',
@@ -205,7 +205,7 @@ describe('signing request', function() {
                 ref_block_prefix: 56789,
             }
         )
-        assert.deepStrictEqual(tx, {
+        assert.deepStrictEqual(recode(tx), {
             actions: [
                 {
                     account: 'eosio.token',
@@ -253,7 +253,7 @@ describe('signing request', function() {
                 ref_block_prefix: 56789,
             }
         )
-        assert.deepStrictEqual(tx, {
+        assert.deepStrictEqual(recode(tx), {
             actions: [
                 {
                     account: 'eosio.token',
@@ -300,7 +300,7 @@ describe('signing request', function() {
             'esr://gmNgZGBY1mTC_MoglIGBIVzX5uxZRqAQGMBoExgDAjRi4fwAVz93ICUckpGYl12skJZfpFCSkaqQllmcwczAAAA'
         )
         const req2 = SigningRequest.from(encoded, options)
-        assert.deepStrictEqual(req2.data, req1.data)
+        assert.deepStrictEqual(recode(req2.data), recode(req1.data))
     })
 
     it('should create identity tx', async function() {
@@ -317,7 +317,7 @@ describe('signing request', function() {
             actor: 'foo',
             permission: 'bar',
         })
-        assert.deepStrictEqual(tx, {
+        assert.deepStrictEqual(recode(tx), {
             actions: [
                 {
                     account: '',
@@ -338,7 +338,7 @@ describe('signing request', function() {
             ],
             context_free_actions: [],
             transaction_extensions: [],
-            expiration: '1970-01-01T00:00:00.000',
+            expiration: '1970-01-01T00:00:00',
             ref_block_num: 0,
             ref_block_prefix: 0,
             max_cpu_usage_ms: 0,
@@ -349,7 +349,7 @@ describe('signing request', function() {
             actor: 'other',
             permission: 'active',
         })
-        assert.notStrictEqual(tx2.actions[0].data, tx.actions[0].data)
+        assert.notStrictEqual(recode(tx2.actions[0].data), recode(tx.actions[0].data))
     })
 
     it('should encode and decode signed requests', async function() {
@@ -374,15 +374,15 @@ describe('signing request', function() {
             },
             {...options, signatureProvider}
         )
-        assert.deepStrictEqual(req1.signature, mockSig)
+        assert.deepStrictEqual(recode(req1.signature), mockSig)
         let encoded = req1.encode()
         assert.strictEqual(
             encoded,
             'esr://gmNgZGBY1mTC_MoglIGBIVzX5uxZoAgIaMSCyBVvjYx0kAUYGNZZvmCGsJhd_YNBNHdGak5OvkJJRmpRKlQ3WLl8anjWFNWd23XWfvzTcy_qmtRx5mtMXlkSC23ZXle6K_NJFJ4SVTb4O026Wb1G5Wx0u1A3-_G4rAPsBp78z9lN7nddAQA'
         )
         let req2 = SigningRequest.from(encoded, options)
-        assert.deepStrictEqual(req2.data, req1.data)
-        assert.deepStrictEqual(req2.signature, mockSig)
+        assert.deepStrictEqual(recode(req2.data), recode(req1.data))
+        assert.deepStrictEqual(recode(req2.signature), mockSig)
     })
 
     it('should encode and decode test requests', async function() {
@@ -393,11 +393,11 @@ describe('signing request', function() {
         let req1 = SigningRequest.from(req1uri, options)
         let req2 = SigningRequest.from(req2uri, options)
         assert.deepStrictEqual(
-            req1.resolveActions(mockAbiProvider.abis),
-            req2.resolveActions(mockAbiProvider.abis)
+            recode(req1.resolveActions(mockAbiProvider.abis)),
+            recode(req2.resolveActions(mockAbiProvider.abis))
         )
         assert.strictEqual(req1.signature, undefined)
-        assert.deepStrictEqual(req2.signature, {
+        assert.deepStrictEqual(recode(req2.signature), {
             signer: 'foobar',
             signature:
                 'SIG_K1_KBub1qmdiPpWA2XKKEZEG3EfKJBf38GETHzbd4t3CBdWLgdvFRLCqbcUsBbbYga6jmxfdSFfodMdhMYraKLhEzjSCsiuMs',
@@ -414,7 +414,7 @@ describe('signing request', function() {
         assert.strictEqual(req.getIdentityPermission(), null)
         assert.strictEqual(req.encode(), reqUri)
         let resolved = req.resolve(new Map(), {actor: 'foo', permission: 'bar'})
-        assert.deepStrictEqual(resolved.transaction, {
+        assert.deepStrictEqual(recode(resolved.transaction), {
             actions: [
                 {
                     account: '',
@@ -435,7 +435,7 @@ describe('signing request', function() {
             ],
             context_free_actions: [],
             delay_sec: 0,
-            expiration: '1970-01-01T00:00:00.000',
+            expiration: '1970-01-01T00:00:00',
             max_cpu_usage_ms: 0,
             max_net_usage_words: 0,
             ref_block_num: 0,
@@ -462,7 +462,7 @@ describe('signing request', function() {
 
     it('should template callback url', async function() {
         const mockSig = 'SIG_K1_K8Wm5AXSQdKYVyYFPCYbMZurcJQXZaSgXoqXAKE6uxR6Jot7otVzS55JGRhixCwNGxaGezrVckDgh88xTsiu4wzzZuP9JE'
-        const mockTx = '308D206C51C5DD6C02E0417E44560CDC2E76DB7765CEA19DFA8F9F94922F928A'
+        const mockTx = '308d206c51c5dd6c02e0417e44560cdc2e76db7765cea19dfa8f9f94922f928a'
         const request = await SigningRequest.create(
             {
                 action: {
@@ -505,11 +505,11 @@ describe('signing request', function() {
         )
         const copy = request.clone()
 
-        assert.deepStrictEqual(request.data, copy.data)
+        assert.deepStrictEqual(recode(request.data), recode(copy.data))
         assert.deepStrictEqual(request.encode(), copy.encode())
 
         copy.setInfoKey('foo', true)
-        assert.notDeepStrictEqual(request.data, copy.data)
+        assert.notDeepStrictEqual(recode(request.data), recode(copy.data))
         assert.notDeepStrictEqual(request.encode(), copy.encode())
     })
 
@@ -529,7 +529,12 @@ describe('signing request', function() {
             }
         )
         const callback = resolved.getCallback(['SIG_K1_KBub1qmdiPpWA2XKKEZEG3EfKJBf38GETHzbd4t3CBdWLgdvFRLCqbcUsBbbYga6jmxfdSFfodMdhMYraKLhEzjSCsiuMs'], 1234)
-        const expected = 'https://example.com?tx=6AFF5C203810FF6B40469FE20318856354889FF037F4CF5B89A157514A43E825&bn=1234'
+        const expected = 'https://example.com?tx=6aff5c203810ff6b40469fe20318856354889ff037f4cf5b89a157514a43e825&bn=1234'
         assert.equal(callback!.url, expected)
     })
 })
+
+
+function recode(value: any) {
+    return JSON.parse(JSON.stringify(value))
+}

@@ -2,12 +2,43 @@
  * EOSIO Signing Request (ESR).
  */
 
-import {Serializer, ABI, ChecksumType, Checksum256, BytesType, Bytes} from 'eosio-core'
+import {
+    ABI,
+    ABIDecoder,
+    ABIEncoder,
+    Action,
+    Bytes,
+    BytesType,
+    ChecksumType,
+    Name,
+    NameType,
+    PermissionLevel,
+    PermissionLevelType,
+    Serializer,
+    TimePointSec,
+    Transaction,
+    UInt16,
+    UInt32,
+} from 'eosio-core'
 
-import * as abi from './abi'
+import {Identity, InfoPair, RequestData, RequestFlags, RequestSignature} from './abi'
 import * as base64u from './base64u'
+import {ChainId, ChainIdVariant, ChainName} from './chain-id'
 
 const ProtocolVersion = 2
+
+const identityAbi = (() => {
+    const abi = Serializer.synthesize(Identity)
+    abi.actions = [{name: 'identity', type: 'identity', ricardian_contract: ''}]
+    return abi
+})() // fixme make this lazy
+
+interface AnyAction {
+    account: NameType
+    name: NameType
+    authorization: PermissionLevelType[]
+    data: any
+}
 
 /** Interface that should be implemented by abi providers. */
 export interface AbiProvider {
@@ -99,38 +130,6 @@ export interface TransactionContext {
     expiration?: string
 }
 
-/** Chain ID aliases. */
-export enum ChainName {
-    UNKNOWN = 0, // reserved
-    EOS = 1,
-    TELOS = 2,
-    JUNGLE = 3,
-    KYLIN = 4,
-    WORBLI = 5,
-    BOS = 6,
-    MEETONE = 7,
-    INSIGHTS = 8,
-    BEOS = 9,
-    WAX = 10,
-    PROTON = 11,
-    FIO = 12,
-}
-
-const ChainIdLookup = new Map<abi.ChainAlias, abi.ChainId>([
-    [ChainName.EOS, 'aca376f206b8fc25a6ed44dbdc66547c36c6c33e3a119ffbeaef943642f0e906'],
-    [ChainName.TELOS, '4667b205c6838ef70ff7988f6e8257e8be0e1284a2f59699054a018f743b1d11'],
-    [ChainName.JUNGLE, 'e70aaab8997e1dfce58fbfac80cbbb8fecec7b99cf982a9444273cbc64c41473'],
-    [ChainName.KYLIN, '5fff1dae8dc8e2fc4d5b23b2c7665c97f9e9d8edf2b6485a86ba311c25639191'],
-    [ChainName.WORBLI, '73647cde120091e0a4b85bced2f3cfdb3041e266cbbe95cee59b73235a1b3b6f'],
-    [ChainName.BOS, 'd5a3d18fbb3c084e3b1f3fa98c21014b5f3db536cc15d08f9f6479517c6a3d86'],
-    [ChainName.MEETONE, 'cfe6486a83bad4962f232d48003b1824ab5665c36778141034d75e57b956e422'],
-    [ChainName.INSIGHTS, 'b042025541e25a472bffde2d62edd457b7e70cee943412b1ea0f044f88591664'],
-    [ChainName.BEOS, 'b912d19a6abd2b1b05611ae5be473355d64d95aeff0c09bedc8c166cd6468fe4'],
-    [ChainName.WAX, '1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4'],
-    [ChainName.PROTON, '384da888112027f0321850a169f737c33e53b388aad48b5adace4bab97f437e0'],
-    [ChainName.FIO, '21dcae42c0182200e93f954a074011f9048a7624c6fe81d3c9541a614a88bd1c'],
-])
-
 /**
  * The placeholder name: `............1` aka `uint64(1)`.
  * If used in action data will be resolved to current signer.
@@ -165,7 +164,7 @@ export const PlaceholderName = '............1' // aka uint64(1)
 /** Placeholder that will resolve to signer permission name. */
 export const PlaceholderPermission = '............2' // aka uint64(2)
 
-export const PlaceholderAuth: abi.PermissionLevel = {
+export const PlaceholderAuth = {
     actor: PlaceholderName,
     permission: PlaceholderPermission,
 }
@@ -174,16 +173,16 @@ export type CallbackType = string | {url: string; background: boolean}
 
 export interface SigningRequestCreateArguments {
     /** Single action to create request with. */
-    action?: abi.Action
+    action?: AnyAction
     /** Multiple actions to create request with. */
-    actions?: abi.Action[]
+    actions?: AnyAction[]
     /**
      * Full or partial transaction to create request with.
      * If TAPoS info is omitted it will be filled in when resolving the request.
      */
-    transaction?: {actions: abi.Action[]; [key: string]: any}
+    transaction?: {actions: AnyAction[]; [key: string]: any}
     /** Create an identity request. */
-    identity?: abi.Identity
+    identity?: {permission?: PermissionLevelType}
     /** Chain to use, defaults to EOS main-net if omitted. */
     chainId?: string | number
     /** Whether wallet should broadcast tx, defaults to true. */
@@ -194,7 +193,7 @@ export interface SigningRequestCreateArguments {
      */
     callback?: CallbackType
     /** Optional metadata to pass along with the request. */
-    info?: {[key: string]: string | Uint8Array}
+    info?: {[key: string]: BytesType}
 }
 
 export interface SigningRequestCreateIdentityArguments {
@@ -234,8 +233,6 @@ export interface SigningRequestEncodingOptions {
 export type AbiMap = Map<string, any>
 
 export class SigningRequest {
-    public static abi = ABI.from(abi.data)
-
     /** Create a new signing request. */
     public static async create(
         args: SigningRequestCreateArguments,
@@ -245,8 +242,8 @@ export class SigningRequest {
         const textDecoder = options.textDecoder || new TextDecoder()
         const data: any = {}
 
-        const serialize = (action: abi.Action) => {
-            return serializeAction(action, textEncoder, textDecoder, options.abiProvider)
+        const serialize = (action: AnyAction) => {
+            return serializeAction(action, options.abiProvider)
         }
 
         // set the request data
@@ -297,19 +294,22 @@ export class SigningRequest {
         }
 
         // set the chain id
-        data.chain_id = variantId(args.chainId)
-        data.flags = abi.RequestFlagsNone
+        data.chain_id = ChainIdVariant.from(
+            args.chainId || ChainName.EOS,
+            typeof args.chainId === 'string' ? 'chain_id' : 'chain_alias'
+        )
+        data.flags = 0
 
         const broadcast = args.broadcast !== undefined ? args.broadcast : true
         if (broadcast) {
-            data.flags |= abi.RequestFlagsBroadcast
+            data.flags |= RequestFlags.broadcast
         }
         if (typeof args.callback === 'string') {
             data.callback = args.callback
         } else if (typeof args.callback === 'object') {
             data.callback = args.callback.url
             if (args.callback.background) {
-                data.flags |= abi.RequestFlagsBackground
+                data.flags |= RequestFlags.background
             }
         } else {
             data.callback = ''
@@ -330,12 +330,9 @@ export class SigningRequest {
                 }
             }
         }
-
         const req = new SigningRequest(
             ProtocolVersion,
-            data,
-            textEncoder,
-            textDecoder,
+            RequestData.from(data),
             options.zlib,
             options.abiProvider
         )
@@ -353,7 +350,7 @@ export class SigningRequest {
         args: SigningRequestCreateIdentityArguments,
         options: SigningRequestEncodingOptions = {}
     ) {
-        let permission: abi.PermissionLevel | null = {
+        let permission: PermissionLevelType | undefined = {
             actor: args.account || PlaceholderName,
             permission: args.permission || PlaceholderPermission,
         }
@@ -361,7 +358,7 @@ export class SigningRequest {
             permission.actor === PlaceholderName &&
             permission.permission === PlaceholderPermission
         ) {
-            permission = null
+            permission = undefined
         }
         return this.create(
             {
@@ -387,29 +384,19 @@ export class SigningRequest {
         serializedTransaction: BytesType,
         options: SigningRequestEncodingOptions = {}
     ) {
-
-        chainId = Checksum256.from(chainId)        
+        const id = ChainId.from(chainId)
         serializedTransaction = Bytes.from(serializedTransaction)
-        
-        let buf = new Serialize.SerialBuffer({
-            textDecoder: options.textDecoder,
-            textEncoder: options.textEncoder,
-        })
-        buf.push(2) // header
-        const id = variantId(chainId)
-        if (id[0] === 'chain_alias') {
-            buf.push(0)
-            buf.push(id[1])
-        } else {
-            buf.push(1)
-            buf.pushArray(Serialize.hexToUint8Array(id[1]))
-        }
-        buf.push(2) // transaction variant
-        buf.pushArray(serializedTransaction)
-        buf.push(abi.RequestFlagsBroadcast) // flags
-        buf.push(0) // callback
-        buf.push(0) // info
-        return SigningRequest.fromData(buf.asUint8Array(), options)
+
+        let encoder = new ABIEncoder()
+        encoder.writeUint8(2) // header
+        encoder.writeBytes(Serializer.encode({object: id.chainVariant}).array)
+        encoder.writeUint8(2) // transaction variant
+        encoder.writeBytes(Bytes.from(serializedTransaction).array)
+        encoder.writeUint8(RequestFlags.broadcast)
+        encoder.writeUint8(0) // callback
+        encoder.writeUint8(0) // info
+
+        return SigningRequest.fromData(encoder.getData(), options)
     }
 
     /** Creates a signing request from encoded `esr:` uri string. */
@@ -425,54 +412,38 @@ export class SigningRequest {
         return SigningRequest.fromData(data, options)
     }
 
-    public static fromData(data: Uint8Array, options: SigningRequestEncodingOptions = {}) {
-        const header = data[0]
+    public static fromData(data: BytesType, options: SigningRequestEncodingOptions = {}) {
+        data = Bytes.from(data)
+        const header = data.array[0]
         const version = header & ~(1 << 7)
         if (version !== ProtocolVersion) {
             throw new Error('Unsupported protocol version')
         }
-        let array = data.slice(1)
+        let payload = data.droppingFirst(1)
         if ((header & (1 << 7)) !== 0) {
             if (!options.zlib) {
                 throw new Error('Compressed URI needs zlib')
             }
-            array = options.zlib.inflateRaw(array)
+            payload = Bytes.from(options.zlib.inflateRaw(payload.array))
         }
-        const textEncoder = options.textEncoder || new TextEncoder()
-        const textDecoder = options.textDecoder || new TextDecoder()
-        const buffer = new Serialize.SerialBuffer({
-            textEncoder,
-            textDecoder,
-            array,
-        })
-        const req = SigningRequest.type.deserialize(buffer)
-        let signature: abi.RequestSignature | undefined
-        if (buffer.haveReadData()) {
-            const type = AbiTypes.get('request_signature')!
-            signature = type.deserialize(buffer)
+        let decoder = new ABIDecoder(payload.array)
+        let req = Serializer.decode({data: decoder, type: RequestData}) as RequestData
+        let sig: RequestSignature | undefined
+        if (decoder.canRead(1)) {
+            sig = Serializer.decode({data: decoder, type: RequestSignature}) as RequestSignature
         }
-        return new SigningRequest(
-            version,
-            req,
-            textEncoder,
-            textDecoder,
-            options.zlib,
-            options.abiProvider,
-            signature
-        )
+        return new SigningRequest(version, req, options.zlib, options.abiProvider, sig)
     }
 
     /** The signing request version. */
     public version: number
 
     /** The raw signing request data. */
-    public data: abi.SigningRequest
+    public data: RequestData
 
     /** The request signature. */
-    public signature?: abi.RequestSignature
+    public signature?: RequestSignature
 
-    private textEncoder: TextEncoder
-    private textDecoder: TextDecoder
     private zlib?: ZlibProvider
     private abiProvider?: AbiProvider
 
@@ -482,23 +453,19 @@ export class SigningRequest {
      */
     constructor(
         version: number,
-        data: abi.SigningRequest,
-        textEncoder: TextEncoder,
-        textDecoder: TextDecoder,
+        data: RequestData,
         zlib?: ZlibProvider,
         abiProvider?: AbiProvider,
-        signature?: abi.RequestSignature
+        signature?: RequestSignature
     ) {
-        if ((data.flags & abi.RequestFlagsBroadcast) !== 0 && data.req[0] === 'identity') {
+        if (data.flags.broadcast && data.req.toJSON()[0] === 'identity') {
             throw new Error('Invalid request (identity request cannot be broadcast)')
         }
-        if ((data.flags & abi.RequestFlagsBroadcast) === 0 && data.callback.length === 0) {
+        if (!data.flags.broadcast && data.callback.length === 0) {
             throw new Error('Invalid request (nothing to do, no broadcast or callback set)')
         }
         this.version = version
         this.data = data
-        this.textEncoder = textEncoder
-        this.textDecoder = textDecoder
         this.zlib = zlib
         this.abiProvider = abiProvider
         this.signature = signature
@@ -510,21 +477,16 @@ export class SigningRequest {
      */
     public sign(signatureProvider: SignatureProvider) {
         const message = this.getSignatureDigest()
-        this.signature = signatureProvider.sign(Serialize.arrayToHex(message))
+        this.signature = RequestSignature.from(signatureProvider.sign(message.hexString))
     }
 
     /**
      * Get the signature digest for this request.
      */
     public getSignatureDigest() {
-        const buffer = new Serialize.SerialBuffer({
-            textEncoder: this.textEncoder,
-            textDecoder: this.textDecoder,
-        })
         // protocol version + utf8 "request"
-        buffer.pushArray([this.version, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74])
-        buffer.pushArray(this.getData())
-        return sha256(buffer.asUint8Array())
+        const prefix = [this.version, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74]
+        return new Bytes().appending(prefix).appending(this.getData()).sha256Digest
     }
 
     /**
@@ -533,7 +495,7 @@ export class SigningRequest {
      * @param signature The signature string.
      */
     public setSignature(signer: string, signature: string) {
-        this.signature = {signer, signature}
+        this.signature = RequestSignature.from({signer, signature})
     }
 
     /**
@@ -543,11 +505,7 @@ export class SigningRequest {
      */
     public setCallback(url: string, background: boolean) {
         this.data.callback = url
-        if (background) {
-            this.data.flags |= abi.RequestFlagsBackground
-        } else {
-            this.data.flags &= ~abi.RequestFlagsBackground
-        }
+        this.data.flags.background = background
     }
 
     /**
@@ -555,11 +513,7 @@ export class SigningRequest {
      * @param broadcast Whether the transaction should be broadcast by receiver.
      */
     public setBroadcast(broadcast: boolean) {
-        if (broadcast) {
-            this.data.flags |= abi.RequestFlagsBroadcast
-        } else {
-            this.data.flags &= ~abi.RequestFlagsBroadcast
-        }
+        this.data.flags.broadcast = broadcast
     }
 
     /**
@@ -601,12 +555,7 @@ export class SigningRequest {
 
     /** Get the request data without header or signature. */
     public getData(): Uint8Array {
-        const buffer = new Serialize.SerialBuffer({
-            textEncoder: this.textEncoder,
-            textDecoder: this.textDecoder,
-        })
-        SigningRequest.type.serialize(buffer, this.data)
-        return buffer.asUint8Array()
+        return Serializer.encode({object: this.data}).array
     }
 
     /** Get signature data, returns an empty array if request is not signed. */
@@ -614,13 +563,7 @@ export class SigningRequest {
         if (!this.signature) {
             return new Uint8Array(0)
         }
-        const buffer = new Serialize.SerialBuffer({
-            textEncoder: this.textEncoder,
-            textDecoder: this.textDecoder,
-        })
-        const type = AbiTypes.get('request_signature')!
-        type.serialize(buffer, this.signature)
-        return buffer.asUint8Array()
+        return Serializer.encode({object: this.signature}).array
     }
 
     /** ABI definitions required to resolve request. */
@@ -646,7 +589,7 @@ export class SigningRequest {
         const abis = new Map<string, any>()
         await Promise.all(
             this.getRequiredAbis().map(async (account) => {
-                abis.set(account, await provider.getAbi(account))
+                abis.set(account.toString(), await provider.getAbi(account.toString()))
             })
         )
         return abis
@@ -657,66 +600,78 @@ export class SigningRequest {
      * @param abis ABI defenitions required to decode all actions.
      * @param signer Placeholders in actions will be resolved to signer if set.
      */
-    public resolveActions(abis: AbiMap, signer?: abi.PermissionLevel): abi.Action[] {
+    public resolveActions(abis: AbiMap, signer?: PermissionLevelType): AnyAction[] {
         return this.getRawActions().map((rawAction) => {
-            let contractAbi: any | undefined
+            let abi: ABI
             if (isIdentity(rawAction)) {
-                contractAbi = abi.data
+                abi = identityAbi
             } else {
-                contractAbi = abis.get(rawAction.account)
+                let rawAbi = abis.get(rawAction.account.toString())
+                if (!rawAbi) {
+                    throw new Error(`Missing ABI definition for ${rawAction.account}`)
+                }
+                abi = ABI.from(rawAbi)
             }
-            if (!contractAbi) {
-                throw new Error(`Missing ABI definition for ${rawAction.account}`)
+            let type = abi.getActionType(rawAction.name)
+            if (!type) {
+                throw new Error(
+                    `Missing type for action ${rawAction.account}:${rawAction.name} in ABI`
+                )
             }
-            const contract = getContract(contractAbi)
+            let data = rawAction.decodeData(type, abi)
+            let authorization = rawAction.authorization
             if (signer) {
-                // hook into eosjs name decoder and return the signing account if we encounter the placeholder
-                // this is fine because getContract re-creates the initial types each time
-                contract.types.get('name')!.deserialize = (buffer: Serialize.SerialBuffer) => {
-                    const name = buffer.getName()
-                    if (name === PlaceholderName) {
-                        return signer.actor
-                    } else if (name === PlaceholderPermission) {
-                        return signer.permission
+                const signerPerm = PermissionLevel.from(signer)
+                const resolve = (value: any): any => {
+                    if (value instanceof Name) {
+                        switch (value.toString()) {
+                            case PlaceholderName:
+                                return signerPerm.actor
+                            case PlaceholderPermission:
+                                return signerPerm.permission
+                            default:
+                                return value
+                        }
+                    } else if (Array.isArray(value)) {
+                        return value.map(resolve)
+                    } else if (typeof value === 'object' && value !== null) {
+                        for (const key of Object.keys(value)) {
+                            value[key] = resolve(value[key])
+                        }
+                        return value
                     } else {
-                        return name
+                        return value
                     }
                 }
-            }
-            const action = Serialize.deserializeAction(
-                contract,
-                rawAction.account,
-                rawAction.name,
-                rawAction.authorization,
-                rawAction.data as any,
-                this.textEncoder,
-                this.textDecoder
-            )
-            if (signer) {
-                action.authorization = action.authorization.map((auth) => {
+                data = resolve(data)
+                authorization = authorization.map((auth) => {
                     let {actor, permission} = auth
-                    if (actor === PlaceholderName) {
-                        actor = signer.actor
+                    if (actor.toString() === PlaceholderName) {
+                        actor = signerPerm.actor
                     }
-                    if (permission === PlaceholderPermission) {
-                        permission = signer.permission
+                    if (permission.toString() === PlaceholderPermission) {
+                        permission = signerPerm.permission
                     }
                     // backwards compatibility, actor placeholder will also resolve to permission when used in auth
-                    if (permission === PlaceholderName) {
-                        permission = signer.permission
+                    if (permission.toString() === PlaceholderName) {
+                        permission = signerPerm.permission
                     }
-                    return {actor, permission}
+                    return PermissionLevel.from({actor, permission})
                 })
             }
-            return action
+            return {
+                ...rawAction,
+                authorization,
+                data,
+            }
         })
     }
 
     public resolveTransaction(
         abis: AbiMap,
-        signer: abi.PermissionLevel,
+        signer: PermissionLevelType,
         ctx: TransactionContext = {}
-    ): abi.Transaction {
+    ) {
         let tx = this.getRawTransaction()
         if (!this.isIdentity() && !hasTapos(tx)) {
             if (
@@ -724,24 +679,22 @@ export class SigningRequest {
                 ctx.ref_block_num !== undefined &&
                 ctx.ref_block_prefix !== undefined
             ) {
-                tx.expiration = ctx.expiration
-                tx.ref_block_num = ctx.ref_block_num
-                tx.ref_block_prefix = ctx.ref_block_prefix
+                tx.expiration = TimePointSec.from(ctx.expiration)
+                tx.ref_block_num = UInt16.from(ctx.ref_block_num)
+                tx.ref_block_prefix = UInt32.from(ctx.ref_block_prefix)
             } else if (
                 ctx.block_num !== undefined &&
                 ctx.ref_block_prefix !== undefined &&
                 ctx.timestamp !== undefined
             ) {
-                const header = Serialize.transactionHeader(
-                    ctx as any,
-                    ctx.expire_seconds !== undefined ? ctx.expire_seconds : 60
-                )
-                tx.expiration = header.expiration
-                tx.ref_block_num = header.ref_block_num
-                tx.ref_block_prefix = header.ref_block_prefix
+                const sec = ctx.expire_seconds !== undefined ? ctx.expire_seconds : 60
+                const expMs = TimePointSec.from(ctx.timestamp).toMilliseconds() + sec * 1000
+                tx.expiration = TimePointSec.fromMilliseconds(expMs)
+                tx.ref_block_num = UInt16.from(ctx.block_num & 0xffff)
+                tx.ref_block_prefix = UInt32.from(ctx.ref_block_prefix)
             } else {
                 throw new Error(
-                    'Invalid transaction context, need either a reference block or explicit TAPoS values'
+                    'Invalid transaction context, need either a reference block or explicit TaPoS values'
                 )
             }
         }
@@ -749,107 +702,83 @@ export class SigningRequest {
         return {...tx, actions}
     }
 
-    public resolve(abis: AbiMap, signer: abi.PermissionLevel, ctx: TransactionContext = {}) {
-        const transaction = this.resolveTransaction(abis, signer, ctx)
-        const buf = new Serialize.SerialBuffer({
-            textDecoder: this.textDecoder,
-            textEncoder: this.textEncoder,
-        })
-        const actions = transaction.actions.map((action) => {
+    public resolve(abis: AbiMap, signer: PermissionLevelType, ctx: TransactionContext = {}) {
+        const tx = this.resolveTransaction(abis, signer, ctx)
+        const actions = tx.actions.map((action) => {
             let contractAbi: any
             if (isIdentity(action)) {
-                contractAbi = abi.data
+                contractAbi = identityAbi
             } else {
-                contractAbi = abis.get(action.account)
+                contractAbi = abis.get(action.account.toString())
             }
             if (!contractAbi) {
                 throw new Error(`Missing ABI definition for ${action.account}`)
             }
-            const contract = getContract(contractAbi)
-            const {textDecoder, textEncoder} = this
-            return Serialize.serializeAction(
-                contract,
-                action.account,
-                action.name,
-                action.authorization,
-                action.data,
-                textEncoder,
-                textDecoder
-            )
+            let abi = ABI.from(contractAbi)
+            let type = abi.getActionType(action.name)
+            let data = Serializer.encode({object: action.data, type, abi})
+            return Action.from({...action, data})
         })
-        SigningRequest.transactionType.serialize(buf, {
-            ...transaction,
-            actions,
-        })
-        const serializedTransaction = buf.asUint8Array()
-        return new ResolvedSigningRequest(this, signer, transaction, serializedTransaction)
+        const transaction = Transaction.from({...tx, actions})
+        const serialized = Serializer.encode({object: transaction})
+        const serializedTransaction = serialized.array
+        return new ResolvedSigningRequest(
+            this,
+            PermissionLevel.from(signer),
+            tx,
+            serializedTransaction
+        )
     }
 
     /**
      * Get the id of the chain where this request is valid.
      * @returns The 32-byte chain id as hex encoded string.
      */
-    public getChainId(): abi.ChainId {
-        const id = this.data.chain_id
-        switch (id[0]) {
-            case 'chain_id':
-                return id[1]
-            case 'chain_alias':
-                if (ChainIdLookup.has(id[1])) {
-                    return ChainIdLookup.get(id[1])!
-                } else {
-                    throw new Error('Unknown chain id alias')
-                }
-            default:
-                throw new Error('Invalid signing request data')
-        }
+    public getChainId(): ChainId {
+        return this.data.chain_id.chainId
     }
 
     /** Return the actions in this request with action data encoded. */
-    public getRawActions() {
+    public getRawActions(): Action[] {
         const req = this.data.req
-        switch (req[0]) {
+        switch (req.variantName) {
             case 'action':
-                return [req[1]]
+                return [req.value as Action]
             case 'action[]':
-                return req[1]
+                return req.value as Action[]
             case 'identity':
-                let data: string = '0101000000000000000200000000000000' // placeholder permission
-                let authorization: abi.PermissionLevel[] = [PlaceholderAuth]
-                if (req[1].permission) {
-                    let buf = new Serialize.SerialBuffer({
-                        textDecoder: this.textDecoder,
-                        textEncoder: this.textEncoder,
-                    })
-                    SigningRequest.idType.serialize(buf, req[1])
-                    data = Serialize.arrayToHex(buf.asUint8Array())
-                    authorization = [req[1].permission]
+                let id = req.value as Identity
+                let data: BytesType = '0101000000000000000200000000000000' // placeholder permission
+                let authorization: PermissionLevelType[] = [PlaceholderAuth]
+                if (id.permission) {
+                    data = Serializer.encode({object: id})
+                    authorization = [id.permission]
                 }
                 return [
-                    {
+                    Action.from({
                         account: '',
                         name: 'identity',
                         authorization,
                         data,
-                    },
+                    }),
                 ]
             case 'transaction':
-                return req[1].actions
+                return (req.value as Transaction).actions
             default:
                 throw new Error('Invalid signing request data')
         }
     }
 
     /** Unresolved transaction. */
-    public getRawTransaction(): abi.Transaction {
+    public getRawTransaction(): Transaction {
         const req = this.data.req
-        switch (req[0]) {
+        switch (req.variantName) {
             case 'transaction':
-                return req[1]
+                return Transaction.from({...(req.value as Transaction)})
             case 'action':
             case 'action[]':
             case 'identity':
-                return {
+                return Transaction.from({
                     actions: this.getRawActions(),
                     context_free_actions: [],
                     transaction_extensions: [],
@@ -859,7 +788,7 @@ export class SigningRequest {
                     max_cpu_usage_ms: 0,
                     max_net_usage_words: 0,
                     delay_sec: 0,
-                }
+                })
             default:
                 throw new Error('Invalid signing request data')
         }
@@ -867,7 +796,7 @@ export class SigningRequest {
 
     /** Whether the request is an identity request. */
     public isIdentity(): boolean {
-        return this.data.req[0] === 'identity'
+        return this.data.req.variantName === 'identity'
     }
 
     /** Whether the request should be broadcast by signer. */
@@ -875,7 +804,7 @@ export class SigningRequest {
         if (this.isIdentity()) {
             return false
         }
-        return (this.data.flags & abi.RequestFlagsBroadcast) !== 0
+        return this.data.flags.broadcast
     }
 
     /**
@@ -884,9 +813,12 @@ export class SigningRequest {
      *       use `isIdentity` to check id requests.
      */
     public getIdentity(): string | null {
-        if (this.data.req[0] === 'identity' && this.data.req[1].permission) {
-            const {actor} = this.data.req[1].permission
-            return actor === PlaceholderName ? null : actor
+        if (!this.isIdentity()) {
+            return null
+        }
+        const id = this.data.req.value as Identity
+        if (id.permission && id.permission.actor.toString() !== PlaceholderName) {
+            return id.permission.actor.toString()
         }
         return null
     }
@@ -897,9 +829,12 @@ export class SigningRequest {
      *       use `isIdentity` to check id requests.
      */
     public getIdentityPermission(): string | null {
-        if (this.data.req[0] === 'identity' && this.data.req[1].permission) {
-            const {permission} = this.data.req[1].permission
-            return permission === PlaceholderName ? null : permission
+        if (!this.isIdentity()) {
+            return null
+        }
+        const id = this.data.req.value as Identity
+        if (id.permission && id.permission.permission.toString() !== PlaceholderPermission) {
+            return id.permission.permission.toString()
         }
         return null
     }
@@ -908,7 +843,7 @@ export class SigningRequest {
     public getRawInfo(): {[key: string]: Uint8Array} {
         let rv: {[key: string]: Uint8Array} = {}
         for (const {key, value} of this.data.info) {
-            rv[key] = typeof value === 'string' ? Serialize.hexToUint8Array(value) : value
+            rv[key] = value.array
         }
         return rv
     }
@@ -918,7 +853,7 @@ export class SigningRequest {
         let rv: {[key: string]: string} = {}
         let raw = this.getRawInfo()
         for (const key of Object.keys(raw)) {
-            rv[key] = this.textDecoder.decode(raw[key])
+            rv[key] = new TextDecoder().decode(raw[key])
         }
         return rv
     }
@@ -931,7 +866,7 @@ export class SigningRequest {
         let encodedValue: Uint8Array
         switch (typeof value) {
             case 'string':
-                encodedValue = this.textEncoder.encode(value)
+                encodedValue = new TextEncoder().encode(value)
                 break
             case 'boolean':
                 encodedValue = new Uint8Array([value ? 1 : 0])
@@ -940,34 +875,21 @@ export class SigningRequest {
                 throw new TypeError('Invalid value type, expected string or boolean.')
         }
         if (!pair) {
-            pair = {key, value: encodedValue}
+            pair = InfoPair.from({key, value: encodedValue})
             this.data.info.push(pair)
         } else {
-            pair.value = encodedValue
+            pair.value = Bytes.from(encodedValue)
         }
     }
 
     /** Return a deep copy of this request. */
     public clone(): SigningRequest {
-        let signature: abi.RequestSignature | undefined
+        let signature: RequestSignature | undefined
         if (this.signature) {
-            signature = JSON.parse(JSON.stringify(this.signature))
+            signature = RequestSignature.from(JSON.parse(JSON.stringify(this.signature)))
         }
-        const data = JSON.stringify(this.data, (key, value) => {
-            if (value instanceof Uint8Array) {
-                return Array.from(value)
-            }
-            return value
-        })
-        return new SigningRequest(
-            this.version,
-            JSON.parse(data),
-            this.textEncoder,
-            this.textDecoder,
-            this.zlib,
-            this.abiProvider,
-            signature
-        )
+        const data = RequestData.from(JSON.parse(JSON.stringify(this.data)))
+        return new SigningRequest(this.version, data, this.zlib, this.abiProvider, signature)
     }
 
     // Convenience methods.
@@ -1001,14 +923,14 @@ export class ResolvedSigningRequest {
     }
 
     public readonly request: SigningRequest
-    public readonly signer: abi.PermissionLevel
-    public readonly transaction: abi.Transaction
+    public readonly signer: PermissionLevel
+    public readonly transaction: any
     public readonly serializedTransaction: Uint8Array
 
     constructor(
         request: SigningRequest,
-        signer: abi.PermissionLevel,
-        transaction: abi.Transaction,
+        signer: PermissionLevel,
+        transaction: any,
         serializedTransaction: Uint8Array
     ) {
         this.request = request
@@ -1018,7 +940,7 @@ export class ResolvedSigningRequest {
     }
 
     public getTransactionId(): string {
-        return Serialize.arrayToHex(sha256(this.serializedTransaction))
+        return Bytes.from(this.serializedTransaction).sha256Digest.hexString
     }
 
     public getCallback(signatures: string[], blockNum?: number): ResolvedCallback | null {
@@ -1032,12 +954,12 @@ export class ResolvedSigningRequest {
         const payload: CallbackPayload = {
             sig: signatures[0],
             tx: this.getTransactionId(),
-            rbn: String(this.transaction.ref_block_num),
-            rid: String(this.transaction.ref_block_prefix),
-            ex: this.transaction.expiration,
+            rbn: String(this.transaction.ref_block_num.value),
+            rid: String(this.transaction.ref_block_prefix.value),
+            ex: this.transaction.expiration.toString(),
             req: this.request.encode(),
-            sa: this.signer.actor,
-            sp: this.signer.permission,
+            sa: this.signer.actor.toString(),
+            sp: this.signer.permission.toString(),
         }
         for (const [n, sig] of signatures.slice(1).entries()) {
             payload[`sig${n}`] = sig
@@ -1049,95 +971,37 @@ export class ResolvedSigningRequest {
             return payload[m] || ''
         })
         return {
-            background: (flags & abi.RequestFlagsBackground) !== 0,
+            background: flags.background,
             payload,
             url,
         }
     }
 }
 
-/** Internal helper that creates a contract representation from an abi for the eosjs serializer. */
-function getContract(contractAbi: any): Serialize.Contract {
-    const types = Serialize.getTypesFromAbi(Serialize.createInitialTypes(), contractAbi)
-    const actions = new Map<string, Serialize.Type>()
-    for (const {name, type} of contractAbi.actions) {
-        actions.set(name, Serialize.getType(types, type))
+async function serializeAction(action: AnyAction, abiProvider?: AbiProvider) {
+    if (Bytes.isBytes(action.data) || action.data.constructor.abiName !== undefined) {
+        return Action.from(action)
     }
-    return {types, actions}
-}
-
-async function serializeAction(
-    action: abi.Action,
-    textEncoder: TextEncoder,
-    textDecoder: TextDecoder,
-    abiProvider?: AbiProvider
-) {
-    if (typeof action.data === 'string') {
-        return action
-    }
-    let contractAbi: any
     if (isIdentity(action)) {
-        contractAbi = abi.data
+        return Action.from({...action, data: Identity.from(action.data)})
     } else if (abiProvider) {
-        contractAbi = await abiProvider.getAbi(action.account)
+        let abiData = await abiProvider.getAbi(Name.from(action.account).toString())
+        return Action.from(action, abiData)
     } else {
         throw new Error('Missing abi provider')
     }
-    const contract = getContract(contractAbi)
-    return Serialize.serializeAction(
-        contract,
-        action.account,
-        action.name,
-        action.authorization,
-        action.data,
-        textEncoder,
-        textDecoder
-    )
 }
 
-function variantId(chainId?: abi.ChainId | abi.ChainAlias): abi.VariantId {
-    if (!chainId) {
-        chainId = ChainName.EOS
-    }
-    if (typeof chainId === 'number') {
-        return ['chain_alias', chainId]
-    } else {
-        // resolve known chain id's to their aliases
-        const name = idToName(chainId)
-        if (name !== ChainName.UNKNOWN) {
-            return ['chain_alias', name]
-        }
-        return ['chain_id', chainId]
-    }
+function isIdentity(action: AnyAction) {
+    const account = Name.from(action.account)
+    const name = Name.from(action.name)
+    return account.toString() === '' && name.toString() === 'identity'
 }
 
-function isIdentity(action: abi.Action) {
-    return action.account === '' && action.name === 'identity'
-}
-
-function hasTapos(tx: abi.Transaction) {
+function hasTapos(tx: Transaction) {
     return !(
-        tx.expiration === '1970-01-01T00:00:00.000' &&
-        tx.ref_block_num === 0 &&
-        tx.ref_block_prefix === 0
-    )
-}
-
-/** Resolve a chain id to a chain name alias, returns UNKNOWN (0x00) if the chain id has no alias. */
-export function idToName(chainId: abi.ChainId): ChainName {
-    chainId = chainId.toLowerCase()
-    for (const [n, id] of ChainIdLookup) {
-        if (id === chainId) {
-            n
-        }
-    }
-    return ChainName.UNKNOWN
-}
-
-/** Resolve a chain name alias to a chain id. */
-export function nameToId(chainName: ChainName): abi.ChainId {
-    return (
-        ChainIdLookup.get(chainName) ||
-        '0000000000000000000000000000000000000000000000000000000000000000'
+        tx.expiration.value.value === 0 &&
+        tx.ref_block_num.value === 0 &&
+        tx.ref_block_prefix.value === 0
     )
 }
