@@ -20,7 +20,7 @@ export enum ChainName {
 @TypeAlias('chain_id')
 export class ChainId extends Checksum256 {
     get chainVariant(): ChainIdVariant {
-        let name = this.chainName
+        const name = this.chainName
         if (name !== ChainName.UNKNOWN) {
             return ChainIdVariant.from(name, 'chain_alias')
         }
@@ -51,7 +51,7 @@ export class ChainIdVariant extends Variant {
         if (this.value instanceof ChainId) {
             return this.value
         }
-        let id = ChainIdLookup.get(this.value.value)
+        const id = ChainIdLookup.get(this.value.value)
         if (!id) {
             throw new Error('Unknown chain id alias')
         }

@@ -70,7 +70,7 @@ export function decode(input: string): Uint8Array {
     let b: number
     let c: number
     let d: number
-    let p: number = 0
+    let p = 0
 
     for (let i = 0; i < input.length; i += 4) {
         a = lookup[input.charCodeAt(i)]

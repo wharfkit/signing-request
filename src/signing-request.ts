@@ -387,7 +387,7 @@ export class SigningRequest {
         const id = ChainId.from(chainId)
         serializedTransaction = Bytes.from(serializedTransaction)
 
-        let encoder = new ABIEncoder()
+        const encoder = new ABIEncoder()
         encoder.writeUint8(2) // header
         encoder.writeBytes(Serializer.encode({object: id.chainVariant}).array)
         encoder.writeUint8(2) // transaction variant
@@ -426,8 +426,8 @@ export class SigningRequest {
             }
             payload = Bytes.from(options.zlib.inflateRaw(payload.array))
         }
-        let decoder = new ABIDecoder(payload.array)
-        let req = Serializer.decode({data: decoder, type: RequestData}) as RequestData
+        const decoder = new ABIDecoder(payload.array)
+        const req = Serializer.decode({data: decoder, type: RequestData}) as RequestData
         let sig: RequestSignature | undefined
         if (decoder.canRead(1)) {
             sig = Serializer.decode({data: decoder, type: RequestSignature}) as RequestSignature
@@ -576,7 +576,7 @@ export class SigningRequest {
 
     /** Whether TaPoS values are required to resolve request. */
     public requiresTapos() {
-        let tx = this.getRawTransaction()
+        const tx = this.getRawTransaction()
         return !this.isIdentity() && !hasTapos(tx)
     }
 
@@ -606,13 +606,13 @@ export class SigningRequest {
             if (isIdentity(rawAction)) {
                 abi = identityAbi
             } else {
-                let rawAbi = abis.get(rawAction.account.toString())
+                const rawAbi = abis.get(rawAction.account.toString())
                 if (!rawAbi) {
                     throw new Error(`Missing ABI definition for ${rawAction.account}`)
                 }
                 abi = ABI.from(rawAbi)
             }
-            let type = abi.getActionType(rawAction.name)
+            const type = abi.getActionType(rawAction.name)
             if (!type) {
                 throw new Error(
                     `Missing type for action ${rawAction.account}:${rawAction.name} in ABI`
@@ -672,7 +672,7 @@ export class SigningRequest {
         signer: PermissionLevelType,
         ctx: TransactionContext = {}
     ) {
-        let tx = this.getRawTransaction()
+        const tx = this.getRawTransaction()
         if (!this.isIdentity() && !hasTapos(tx)) {
             if (
                 ctx.expiration !== undefined &&
@@ -714,9 +714,9 @@ export class SigningRequest {
             if (!contractAbi) {
                 throw new Error(`Missing ABI definition for ${action.account}`)
             }
-            let abi = ABI.from(contractAbi)
-            let type = abi.getActionType(action.name)
-            let data = Serializer.encode({object: action.data, type, abi})
+            const abi = ABI.from(contractAbi)
+            const type = abi.getActionType(action.name)
+            const data = Serializer.encode({object: action.data, type, abi})
             return Action.from({...action, data})
         })
         const transaction = Transaction.from({...tx, actions})
@@ -747,7 +747,7 @@ export class SigningRequest {
             case 'action[]':
                 return req.value as Action[]
             case 'identity':
-                let id = req.value as Identity
+                const id = req.value as Identity
                 let data: BytesType = '0101000000000000000200000000000000' // placeholder permission
                 let authorization: PermissionLevelType[] = [PlaceholderAuth]
                 if (id.permission) {
@@ -841,7 +841,7 @@ export class SigningRequest {
 
     /** Get raw info dict */
     public getRawInfo(): {[key: string]: Uint8Array} {
-        let rv: {[key: string]: Uint8Array} = {}
+        const rv: {[key: string]: Uint8Array} = {}
         for (const {key, value} of this.data.info) {
             rv[key] = value.array
         }
@@ -850,8 +850,8 @@ export class SigningRequest {
 
     /** Get metadata values as strings. */
     public getInfo(): {[key: string]: string} {
-        let rv: {[key: string]: string} = {}
-        let raw = this.getRawInfo()
+        const rv: {[key: string]: string} = {}
+        const raw = this.getRawInfo()
         for (const key of Object.keys(raw)) {
             rv[key] = new TextDecoder().decode(raw[key])
         }
@@ -985,7 +985,7 @@ async function serializeAction(action: AnyAction, abiProvider?: AbiProvider) {
     if (isIdentity(action)) {
         return Action.from({...action, data: Identity.from(action.data)})
     } else if (abiProvider) {
-        let abiData = await abiProvider.getAbi(Name.from(action.account).toString())
+        const abiData = await abiProvider.getAbi(Name.from(action.account).toString())
         return Action.from(action, abiData)
     } else {
         throw new Error('Missing abi provider')
