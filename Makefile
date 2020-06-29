@@ -1,30 +1,43 @@
+PATH  := $(PATH):$(PWD)/node_modules/.bin
+SHELL := env PATH=$(PATH) /bin/bash
 SRC_FILES := $(shell find src -name '*.ts')
+LIB_FILES := lib/index.js lib/index.m.js lib/index.esm.js
 
-all: lib
+all: $(LIB_FILES)
 
-lib: $(SRC_FILES) node_modules tsconfig.json
-	./node_modules/.bin/tsc -p tsconfig.json --outDir lib
-	./node_modules/.bin/microbundle --format umd --external eosjs,crypto --no-compress
-	touch lib
+lib:
+	mkdir lib
 
-.PHONY: lint
-lint: node_modules
-	./node_modules/.bin/tslint -p tsconfig.json -c tslint.json -t stylish --fix
+.NOTPARALLEL:
+$(LIB_FILES): $(SRC_FILES) lib node_modules tsconfig.json
+	microbundle --format modern,es,cjs
 
 .PHONY: test
 test: node_modules
-	TS_NODE_PROJECT=./test/tsconfig.json ./node_modules/.bin/mocha --require ts-node/register --extensions ts test/*.ts --grep '$(grep)'
+	@mocha -r ts-node/register --extension ts test/*.ts --grep '$(grep)'
 
-.PHONY: test-umd
-test-umd: node_modules lib
-	TEST_UMD=1 TS_NODE_PROJECT=./test/tsconfig.json ./node_modules/.bin/mocha --require ts-node/register --extensions ts test/*.ts --grep '$(grep)'
+.PHONY: coverage
+coverage: node_modules
+	@nyc --reporter=html mocha -r ts-node/register --extension ts test/*.ts -R nyan && open coverage/index.html
+
+.PHONY: lint
+lint: node_modules
+	@eslint src --ext .ts --fix
+
+.PHONY: ci-test
+ci-test: node_modules
+	@nyc --reporter=text mocha -r ts-node/register --extension ts test/*.ts -R list
+
+.PHONY: ci-lint
+ci-lint: node_modules
+	@eslint src --ext .ts --max-warnings 0 --format unix && echo "Ok"
 
 node_modules:
 	yarn install --non-interactive --frozen-lockfile --ignore-scripts
 
 .PHONY: clean
 clean:
-	rm -rf lib/
+	rm -rf lib/ coverage/
 
 .PHONY: distclean
 distclean: clean
