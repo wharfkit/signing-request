@@ -1,4 +1,4 @@
-import {Checksum256, ChecksumType, TypeAlias, UInt8, Variant} from 'eosio-core'
+import {Checksum256, Checksum256Type, TypeAlias, UInt8, Variant} from 'eosio-core'
 
 /** Chain ID aliases. */
 export enum ChainName {
@@ -17,8 +17,17 @@ export enum ChainName {
     FIO = 12,
 }
 
+export type ChainIdType = ChainId | ChainName | Checksum256Type
+
 @TypeAlias('chain_id')
 export class ChainId extends Checksum256 {
+    static from<T extends typeof Checksum256>(this: T, value: ChainIdType): InstanceType<T> {
+        if (typeof value === 'number') {
+            return ChainIdVariant.from(value).chainId as InstanceType<T>
+        }
+        return super.from(value) as InstanceType<T>
+    }
+
     get chainVariant(): ChainIdVariant {
         const name = this.chainName
         if (name !== ChainName.UNKNOWN) {
@@ -59,7 +68,7 @@ export class ChainIdVariant extends Variant {
     }
 }
 
-const ChainIdLookup = new Map<ChainName, ChecksumType>([
+const ChainIdLookup = new Map<ChainName, Checksum256Type>([
     [ChainName.EOS, 'aca376f206b8fc25a6ed44dbdc66547c36c6c33e3a119ffbeaef943642f0e906'],
     [ChainName.TELOS, '4667b205c6838ef70ff7988f6e8257e8be0e1284a2f59699054a018f743b1d11'],
     [ChainName.JUNGLE, 'e70aaab8997e1dfce58fbfac80cbbb8fecec7b99cf982a9444273cbc64c41473'],

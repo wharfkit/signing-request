@@ -4,6 +4,7 @@ import {
     Action,
     Bytes,
     Name,
+    PermissionLevel,
     Signature,
     Struct,
     Transaction,
@@ -19,12 +20,6 @@ export class AccountName extends Name {}
 
 @TypeAlias('permission_name')
 export class PermissionName extends Name {}
-
-@Struct.type('permission_level')
-export class PermissionLevel extends Struct {
-    @Struct.field(AccountName) actor!: AccountName
-    @Struct.field(PermissionName) permission!: PermissionName
-}
 
 @Struct.type('identity')
 export class Identity extends Struct {
@@ -57,9 +52,9 @@ export class RequestFlags extends UInt8 {
 
     private setFlag(flag: number, enabled: boolean) {
         if (enabled) {
-            this.value &= ~flag
-        } else {
             this.value |= flag
+        } else {
+            this.value &= ~flag
         }
     }
 }

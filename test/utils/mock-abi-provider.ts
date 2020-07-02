@@ -1,6 +1,7 @@
 import {readdirSync as readdir, readFileSync as readfile} from 'fs'
 import {join as joinPath} from 'path'
 import {AbiProvider} from '../../src'
+import {Name} from 'eosio-core'
 
 // To add an ABI for testing run (in project root):
 // CONTRACT=eosio.token; cleos -u https://eos.greymass.com get abi $CONTRACT > test/abis/$CONTRACT.json
@@ -8,8 +9,8 @@ import {AbiProvider} from '../../src'
 export class MockAbiProvider implements AbiProvider {
     constructor(public readonly abis: Map<string, any>) {}
 
-    public async getAbi(account: string) {
-        const abi = this.abis.get(account)
+    public async getAbi(account: Name) {
+        const abi = this.abis.get(account.toString())
         if (!abi) {
             throw new Error(`No ABI for: ${account}`)
         }

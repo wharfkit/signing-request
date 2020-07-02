@@ -8,10 +8,12 @@ import zlib from './utils/node-zlib-provider'
 
 import {SignatureProvider, SigningRequestEncodingOptions} from '../src'
 import * as TSModule from '../src'
+import {Serializer} from 'eosio-core'
 
 let {SigningRequest, PlaceholderAuth, PlaceholderName} = TSModule
 if (process.env['TEST_UMD']) {
-    const UMDModule = require('./../lib/index.umd')
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const UMDModule = require('./../lib/index.es5')
     SigningRequest = UMDModule.SigningRequest
     console.log(' -- TESTING UMD BUNDLE -- ')
 }
@@ -19,14 +21,12 @@ if (process.env['TEST_UMD']) {
 const options: SigningRequestEncodingOptions = {
     abiProvider,
     zlib,
-    textDecoder: new TextDecoder(),
-    textEncoder: new TextEncoder(),
 }
 
 const timestamp = '2018-02-15T00:00:00'
 
-describe('signing request', function() {
-    it('should create from action', async function() {
+describe('signing request', function () {
+    it('should create from action', async function () {
         const request = await SigningRequest.create(
             {
                 action: {
@@ -56,7 +56,7 @@ describe('signing request', function() {
         })
     })
 
-    it('should create from actions', async function() {
+    it('should create from actions', async function () {
         const request = await SigningRequest.create(
             {
                 callback: {
@@ -107,7 +107,7 @@ describe('signing request', function() {
         })
     })
 
-    it('should create from transaction', async function() {
+    it('should create from transaction', async function () {
         const request = await SigningRequest.create(
             {
                 broadcast: false,
@@ -159,7 +159,7 @@ describe('signing request', function() {
         })
     })
 
-    it('should create from uri', async function() {
+    it('should create from uri', async function () {
         const request = await SigningRequest.from(
             'esr://gmNgZGBY1mTC_MoglIGBIVzX5uxZRqAQGMBoExgDAjRi4fwAVz93ICUckpGYl12skJZfpFCSkaqQllmcwczAAAA',
             options
@@ -171,7 +171,7 @@ describe('signing request', function() {
                 {
                     account: 'eosio.token',
                     name: 'transfer',
-                    authorization: [{actor: PlaceholderName, permission: PlaceholderName}],
+                    authorization: [{actor: '............1', permission: '............1'}],
                     data:
                         '0100000000000000000000000000285d01000000000000000050454e47000000135468616e6b7320666f72207468652066697368',
                 },
@@ -182,7 +182,7 @@ describe('signing request', function() {
         })
     })
 
-    it('should resolve to transaction', async function() {
+    it('should resolve to transaction', async function () {
         const request = await SigningRequest.create(
             {
                 action: {
@@ -225,7 +225,7 @@ describe('signing request', function() {
         })
     })
 
-    it('should resolve with placeholder name', async function() {
+    it('should resolve with placeholder name', async function () {
         const request = await SigningRequest.create(
             {
                 action: {
@@ -273,7 +273,7 @@ describe('signing request', function() {
         })
     })
 
-    it('should encode and decode requests', async function() {
+    it('should encode and decode requests', async function () {
         const req1 = await SigningRequest.create(
             {
                 callback: {
@@ -303,8 +303,8 @@ describe('signing request', function() {
         assert.deepStrictEqual(recode(req2.data), recode(req1.data))
     })
 
-    it('should create identity tx', async function() {
-        let req = await SigningRequest.identity(
+    it('should create identity tx', async function () {
+        const req = await SigningRequest.identity(
             {
                 callback: {
                     background: true,
@@ -313,7 +313,7 @@ describe('signing request', function() {
             },
             options
         )
-        let tx = req.resolveTransaction(mockAbiProvider.abis, {
+        const tx = req.resolveTransaction(mockAbiProvider.abis, {
             actor: 'foo',
             permission: 'bar',
         })
@@ -345,14 +345,14 @@ describe('signing request', function() {
             max_net_usage_words: 0,
             delay_sec: 0,
         })
-        let tx2 = req.resolveTransaction(mockAbiProvider.abis, {
+        const tx2 = req.resolveTransaction(mockAbiProvider.abis, {
             actor: 'other',
             permission: 'active',
         })
         assert.notStrictEqual(recode(tx2.actions[0].data), recode(tx.actions[0].data))
     })
 
-    it('should encode and decode signed requests', async function() {
+    it('should encode and decode signed requests', async function () {
         const mockSig = {
             signer: 'foo',
             signature:
@@ -375,23 +375,23 @@ describe('signing request', function() {
             {...options, signatureProvider}
         )
         assert.deepStrictEqual(recode(req1.signature), mockSig)
-        let encoded = req1.encode()
+        const encoded = req1.encode()
         assert.strictEqual(
             encoded,
             'esr://gmNgZGBY1mTC_MoglIGBIVzX5uxZoAgIaMSCyBVvjYx0kAUYGNZZvmCGsJhd_YNBNHdGak5OvkJJRmpRKlQ3WLl8anjWFNWd23XWfvzTcy_qmtRx5mtMXlkSC23ZXle6K_NJFJ4SVTb4O026Wb1G5Wx0u1A3-_G4rAPsBp78z9lN7nddAQA'
         )
-        let req2 = SigningRequest.from(encoded, options)
+        const req2 = SigningRequest.from(encoded, options)
         assert.deepStrictEqual(recode(req2.data), recode(req1.data))
         assert.deepStrictEqual(recode(req2.signature), mockSig)
     })
 
-    it('should encode and decode test requests', async function() {
-        let req1uri =
+    it('should encode and decode test requests', async function () {
+        const req1uri =
             'esr://gmNgZGBY1mTC_MoglIGBIVzX5uxZRqAQGMBoExgDAjRi4fwAVz93ICUckpGYl12skJZfpFCSkaqQllmcwczAAAA'
-        let req2uri =
+        const req2uri =
             'esr://gmNgZGBY1mTC_MoglIGBIVzX5uxZRqAQGMBoExgDAjRi4fwAVz93ICUckpGYl12skJZfpFCSkaqQllmcwQxREVOsEcsgX-9-jqsy1EhNQM_GM_FkQMIziUU1VU4PsmOn_3r5hUMumeN3PXvdSuWMm1o9u6-FmCwtPvR0haqt12fNKtlWzTuiNwA'
-        let req1 = SigningRequest.from(req1uri, options)
-        let req2 = SigningRequest.from(req2uri, options)
+        const req1 = SigningRequest.from(req1uri, options)
+        const req2 = SigningRequest.from(req2uri, options)
         assert.deepStrictEqual(
             recode(req1.resolveActions(mockAbiProvider.abis)),
             recode(req2.resolveActions(mockAbiProvider.abis))
@@ -406,14 +406,14 @@ describe('signing request', function() {
         assert.strictEqual(req2.encode(), req2uri)
     })
 
-    it('should generate correct identity requests', async function() {
-        let reqUri = 'esr://AgABAwACJWh0dHBzOi8vY2guYW5jaG9yLmxpbmsvMTIzNC00NTY3LTg5MDAA'
-        let req = SigningRequest.from(reqUri, options)
+    it('should generate correct identity requests', async function () {
+        const reqUri = 'esr://AgABAwACJWh0dHBzOi8vY2guYW5jaG9yLmxpbmsvMTIzNC00NTY3LTg5MDAA'
+        const req = SigningRequest.from(reqUri, options)
         assert.strictEqual(req.isIdentity(), true)
         assert.strictEqual(req.getIdentity(), null)
         assert.strictEqual(req.getIdentityPermission(), null)
         assert.strictEqual(req.encode(), reqUri)
-        let resolved = req.resolve(new Map(), {actor: 'foo', permission: 'bar'})
+        const resolved = req.resolve(new Map(), {actor: 'foo', permission: 'bar'})
         assert.deepStrictEqual(recode(resolved.transaction), {
             actions: [
                 {
@@ -444,24 +444,27 @@ describe('signing request', function() {
         })
     })
 
-    it('should encode and decode with metadata', async function() {
-        let req = await SigningRequest.identity(
+    it('should encode and decode with metadata', async function () {
+        const data = Serializer.encode({object: 'hello', type: 'string'})
+        const req = await SigningRequest.identity(
             {
                 callback: 'https://example.com',
                 info: {
                     foo: 'bar',
-                    baz: new Uint8Array([0x00, 0x01, 0x02]) as any,
+                    baz: data,
                 },
             },
             options
         )
-        let decoded = SigningRequest.from(req.encode(), options)
-        assert.deepStrictEqual(decoded.getInfo(), req.getInfo())
-        assert.deepStrictEqual(decoded.getInfo(), {foo: 'bar', baz: '\u0000\u0001\u0002'})
+        const decoded = SigningRequest.from(req.encode(), options)
+        assert.deepStrictEqual(decoded.getRawInfoKey('foo'), req.getRawInfoKey('foo'))
+        assert.deepStrictEqual(decoded.getRawInfoKey('foo'), req.getRawInfoKey('foo'))
+        // assert.deepStrictEqual(decoded.getInfo(), {foo: 'bar', baz: '\u0000\u0001\u0002'})
     })
 
-    it('should template callback url', async function() {
-        const mockSig = 'SIG_K1_K8Wm5AXSQdKYVyYFPCYbMZurcJQXZaSgXoqXAKE6uxR6Jot7otVzS55JGRhixCwNGxaGezrVckDgh88xTsiu4wzzZuP9JE'
+    it('should template callback url', async function () {
+        const mockSig =
+            'SIG_K1_K8Wm5AXSQdKYVyYFPCYbMZurcJQXZaSgXoqXAKE6uxR6Jot7otVzS55JGRhixCwNGxaGezrVckDgh88xTsiu4wzzZuP9JE'
         const mockTx = '308d206c51c5dd6c02e0417e44560cdc2e76db7765cea19dfa8f9f94922f928a'
         const request = await SigningRequest.create(
             {
@@ -471,7 +474,7 @@ describe('signing request', function() {
                     authorization: [{actor: 'foo', permission: 'active'}],
                     data: {from: 'foo', to: 'bar', quantity: '1.000 EOS', memo: 'hello there'},
                 },
-                callback: 'https://example.com/?sig={{sig}}&tx={{tx}}'
+                callback: 'https://example.com/?sig={{sig}}&tx={{tx}}',
             },
             options
         )
@@ -486,12 +489,12 @@ describe('signing request', function() {
                 ref_block_prefix: 56789,
             }
         )
-        const callback:any = resolved.getCallback([mockSig]);
+        const callback: any = resolved.getCallback([mockSig])
         const expected = `https://example.com/?sig=${mockSig}&tx=${mockTx}`
         assert.deepStrictEqual(callback.url, expected)
     })
 
-    it('should deep clone', async function() {
+    it('should deep clone', async function () {
         const request = await SigningRequest.create(
             {
                 action: {
@@ -520,7 +523,7 @@ describe('signing request', function() {
         const abis = await req1.fetchAbis()
         const resolved = await req1.resolve(
             abis,
-            { actor: 'foo', permission: 'bar' },
+            {actor: 'foo', permission: 'bar'},
             {
                 timestamp,
                 block_num: 1234,
@@ -528,12 +531,17 @@ describe('signing request', function() {
                 ref_block_prefix: 56789,
             }
         )
-        const callback = resolved.getCallback(['SIG_K1_KBub1qmdiPpWA2XKKEZEG3EfKJBf38GETHzbd4t3CBdWLgdvFRLCqbcUsBbbYga6jmxfdSFfodMdhMYraKLhEzjSCsiuMs'], 1234)
-        const expected = 'https://example.com?tx=6aff5c203810ff6b40469fe20318856354889ff037f4cf5b89a157514a43e825&bn=1234'
+        const callback = resolved.getCallback(
+            [
+                'SIG_K1_KBub1qmdiPpWA2XKKEZEG3EfKJBf38GETHzbd4t3CBdWLgdvFRLCqbcUsBbbYga6jmxfdSFfodMdhMYraKLhEzjSCsiuMs',
+            ],
+            1234
+        )
+        const expected =
+            'https://example.com?tx=6aff5c203810ff6b40469fe20318856354889ff037f4cf5b89a157514a43e825&bn=1234'
         assert.equal(callback!.url, expected)
     })
 })
-
 
 function recode(value: any) {
     return JSON.parse(JSON.stringify(value))
