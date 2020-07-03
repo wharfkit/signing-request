@@ -20,6 +20,7 @@ import {
     PermissionLevel,
     PermissionLevelType,
     Serializer,
+    Signature,
     SignatureType,
     TimePointSec,
     TimePointType,
@@ -127,7 +128,7 @@ export interface TransactionContext {
      */
     expire_seconds?: UInt32Type
     /** Block number ref_block_num will be derived from. */
-    block_num?: UInt64Type // TODO Not sure what type this is
+    block_num?: UInt32Type
     /** Reference block number, takes precedence over block_num if both is set. */
     ref_block_num?: UInt16Type
     /** Reference block prefix. */
@@ -752,13 +753,7 @@ export class SigningRequest {
             return Action.from({...action, data})
         })
         const transaction = Transaction.from({...tx, actions})
-        const serializedTransaction = Serializer.encode({object: transaction})
-        return new ResolvedSigningRequest(
-            this,
-            PermissionLevel.from(signer),
-            tx,
-            serializedTransaction
-        )
+        return new ResolvedSigningRequest(this, PermissionLevel.from(signer), transaction, tx)
     }
 
     /**
@@ -943,8 +938,8 @@ export class ResolvedSigningRequest {
             abis,
             {actor: payload.sa, permission: payload.sp},
             {
-                ref_block_num: Number(payload.rbn),
-                ref_block_prefix: Number(payload.rid),
+                ref_block_num: payload.rbn,
+                ref_block_prefix: payload.rid,
                 expiration: payload.ex,
             }
         )
@@ -954,28 +949,31 @@ export class ResolvedSigningRequest {
     public readonly request: SigningRequest
     /** Expected signer of transaction. */
     public readonly signer: PermissionLevel
+    /** Transaction object with action data encoded. */
+    public readonly transaction: Transaction
     /** Transaction object with action data decoded. */
-    public readonly transaction: ResolvedTransaction
-    /** Serialized transaction data. */
-    public readonly serializedTransaction: Bytes
+    public readonly resolvedTransaction: ResolvedTransaction
 
     constructor(
         request: SigningRequest,
         signer: PermissionLevel,
-        transaction: ResolvedTransaction,
-        serializedTransaction: Bytes
+        transaction: Transaction,
+        resolvedTransaction: ResolvedTransaction
     ) {
         this.request = request
         this.signer = signer
         this.transaction = transaction
-        this.serializedTransaction = serializedTransaction
+        this.resolvedTransaction = resolvedTransaction
     }
 
-    public getTransactionId(): Checksum256 {
-        return this.serializedTransaction.sha256Digest
+    public get serializedTransaction(): Uint8Array {
+        return Serializer.encode({object: this.transaction}).array
     }
 
-    public getCallback(signatures: string[], blockNum?: number): ResolvedCallback | null {
+    public getCallback(
+        signatures: SignatureType[],
+        blockNum?: UInt32Type
+    ): ResolvedCallback | null {
         const {callback, flags} = this.request.data
         if (!callback || callback.length === 0) {
             return null
@@ -983,21 +981,22 @@ export class ResolvedSigningRequest {
         if (!signatures || signatures.length === 0) {
             throw new Error('Must have at least one signature to resolve callback')
         }
+        const sigs = signatures.map((sig) => Signature.from(sig))
         const payload: CallbackPayload = {
-            sig: signatures[0],
-            tx: this.getTransactionId().toString(),
-            rbn: String(UInt16.from(this.transaction.ref_block_num)),
-            rid: String(UInt32.from(this.transaction.ref_block_prefix)),
-            ex: this.transaction.expiration.toString(),
+            sig: String(sigs[0]),
+            tx: String(this.transaction.id),
+            rbn: String(this.transaction.ref_block_num),
+            rid: String(this.transaction.ref_block_prefix),
+            ex: String(this.transaction.expiration),
             req: this.request.encode(),
-            sa: this.signer.actor.toString(),
-            sp: this.signer.permission.toString(),
+            sa: String(this.signer.actor),
+            sp: String(this.signer.permission),
         }
-        for (const [n, sig] of signatures.slice(1).entries()) {
-            payload[`sig${n}`] = sig
+        for (const [n, sig] of sigs.slice(1).entries()) {
+            payload[`sig${n}`] = String(sig)
         }
         if (blockNum) {
-            payload.bn = String(blockNum)
+            payload.bn = String(UInt32.from(blockNum))
         }
         const url = callback.replace(/({{([a-z0-9]+)}})/g, (_1, _2, m) => {
             return payload[m] || ''

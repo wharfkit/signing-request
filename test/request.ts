@@ -414,7 +414,7 @@ describe('signing request', function () {
         assert.strictEqual(req.getIdentityPermission(), null)
         assert.strictEqual(req.encode(), reqUri)
         const resolved = req.resolve(new Map(), {actor: 'foo', permission: 'bar'})
-        assert.deepStrictEqual(recode(resolved.transaction), {
+        assert.deepStrictEqual(recode(resolved.resolvedTransaction), {
             actions: [
                 {
                     account: '',
