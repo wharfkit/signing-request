@@ -333,10 +333,7 @@ export class SigningRequest {
         }
 
         // set the chain id
-        data.chain_id = ChainIdVariant.from(
-            args.chainId || ChainName.EOS,
-            typeof args.chainId === 'string' ? 'chain_id' : 'chain_alias'
-        )
+        data.chain_id = ChainId.from(args.chainId || ChainName.EOS).chainVariant
 
         // request flags and callback
         const flags = RequestFlags.from(0)

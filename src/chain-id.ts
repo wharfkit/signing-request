@@ -22,8 +22,14 @@ export type ChainIdType = ChainId | ChainName | Checksum256Type
 @TypeAlias('chain_id')
 export class ChainId extends Checksum256 {
     static from<T extends typeof Checksum256>(this: T, value: ChainIdType): InstanceType<T> {
+        if (value instanceof this) {
+            return value as InstanceType<T>
+        }
         if (typeof value === 'number') {
-            return ChainIdVariant.from(value).chainId as InstanceType<T>
+            value = ChainIdLookup.get(value) as Checksum256Type
+            if (!value) {
+                throw new Error('Unknown chain id alias')
+            }
         }
         return super.from(value) as InstanceType<T>
     }
@@ -31,7 +37,7 @@ export class ChainId extends Checksum256 {
     get chainVariant(): ChainIdVariant {
         const name = this.chainName
         if (name !== ChainName.UNKNOWN) {
-            return ChainIdVariant.from(name, 'chain_alias')
+            return ChainIdVariant.from(['chain_alias', name])
         }
         return ChainIdVariant.from(this)
     }
@@ -60,11 +66,7 @@ export class ChainIdVariant extends Variant {
         if (this.value instanceof ChainId) {
             return this.value
         }
-        const id = ChainIdLookup.get(this.value.value)
-        if (!id) {
-            throw new Error('Unknown chain id alias')
-        }
-        return ChainId.from(id)
+        return ChainId.from(this.value.value)
     }
 }
 
