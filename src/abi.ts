@@ -22,13 +22,24 @@ export class AccountName extends Name {}
 export class PermissionName extends Name {}
 
 @Struct.type('identity')
-export class Identity extends Struct {
+export class IdentityV2 extends Struct {
     @Struct.field(PermissionLevel, {optional: true}) permission?: PermissionLevel
 }
 
-@Variant.type('variant_req', [Action, {type: Action, array: true}, Transaction, Identity])
-export class RequestVariant extends Variant {
-    value!: Action | Action[] | Transaction | Identity
+@Struct.type('identity')
+export class IdentityV3 extends Struct {
+    @Struct.field('name') scope!: Name
+    @Struct.field(PermissionLevel, {optional: true}) permission?: PermissionLevel
+}
+
+@Variant.type('variant_req', [Action, {type: Action, array: true}, Transaction, IdentityV2])
+export class RequestVariantV2 extends Variant {
+    value!: Action | Action[] | Transaction | IdentityV2
+}
+
+@Variant.type('variant_req', [Action, {type: Action, array: true}, Transaction, IdentityV3])
+export class RequestVariantV3 extends Variant {
+    value!: Action | Action[] | Transaction | IdentityV3
 }
 
 @TypeAlias('request_flags')
@@ -66,9 +77,18 @@ export class InfoPair extends Struct {
 }
 
 @Struct.type('signing_request')
-export class RequestData extends Struct {
+export class RequestDataV2 extends Struct {
     @Struct.field(ChainIdVariant) chain_id!: ChainIdVariant
-    @Struct.field(RequestVariant) req!: RequestVariant
+    @Struct.field(RequestVariantV2) req!: RequestVariantV2
+    @Struct.field(RequestFlags) flags!: RequestFlags
+    @Struct.field('string') callback!: string
+    @Struct.field(InfoPair, {array: true}) info!: InfoPair[]
+}
+
+@Struct.type('signing_request')
+export class RequestDataV3 extends Struct {
+    @Struct.field(ChainIdVariant) chain_id!: ChainIdVariant
+    @Struct.field(RequestVariantV3) req!: RequestVariantV3
     @Struct.field(RequestFlags) flags!: RequestFlags
     @Struct.field('string') callback!: string
     @Struct.field(InfoPair, {array: true}) info!: InfoPair[]

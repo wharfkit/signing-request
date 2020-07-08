@@ -30,22 +30,24 @@ import {
     UInt16Type,
     UInt32,
     UInt32Type,
-    UInt64Type,
     UInt8,
     VarUInt,
 } from 'eosio-core'
 
 import * as base64u from './base64u'
-import {ChainAlias, ChainId, ChainIdType, ChainIdVariant, ChainName} from './chain-id'
-import {Identity, InfoPair, RequestData, RequestFlags, RequestSignature} from './abi'
+import {ChainAlias, ChainId, ChainIdType, ChainName} from './chain-id'
+import {
+    IdentityV2,
+    IdentityV3,
+    InfoPair,
+    RequestDataV2,
+    RequestDataV3,
+    RequestFlags,
+    RequestSignature,
+} from './abi'
 
-const ProtocolVersion = 2
-
-const identityAbi = (() => {
-    const abi = Serializer.synthesize(Identity)
-    abi.actions = [{name: 'identity', type: 'identity', ricardian_contract: ''}]
-    return abi
-})() // fixme make this lazy
+/** Current supported protocol version, backwards compatible with version 2. */
+export const ProtocolVersion = 3
 
 /** Interface that should be implemented by abi providers. */
 export interface AbiProvider {
@@ -221,7 +223,10 @@ export interface SigningRequestCreateArguments {
      */
     transaction?: Partial<AnyTransaction>
     /** Create an identity request. */
-    identity?: {permission?: PermissionLevelType}
+    identity?: {
+        scope?: NameType
+        permission?: PermissionLevelType
+    }
     /** Chain to use, defaults to EOS main-net if omitted. */
     chainId?: string | number
     /** Whether wallet should broadcast tx, defaults to true. */
@@ -268,20 +273,40 @@ export interface SigningRequestEncodingOptions {
 export type AbiMap = Map<string, ABI>
 
 export class SigningRequest {
+    /** Return the identity ABI for given version. */
+    private static identityAbi(version: number) {
+        const abi = Serializer.synthesize(this.identityType(version))
+        abi.actions = [{name: 'identity', type: 'identity', ricardian_contract: ''}]
+        return abi
+    }
+
+    /** Return the ABISerializableType identity type for given version. */
+    private static identityType(version: number): typeof IdentityV2 | typeof IdentityV3 {
+        return version === 2 ? IdentityV2 : IdentityV3
+    }
+
+    /** Return the ABISerializableType storage type for given version. */
+    private static storageType(version: number): typeof RequestDataV3 | typeof RequestDataV2 {
+        return version === 2 ? RequestDataV2 : RequestDataV3
+    }
+
     /** Create a new signing request. */
     public static async create(
         args: SigningRequestCreateArguments,
         options: SigningRequestEncodingOptions = {}
     ) {
+        let version = 2
         const data: any = {}
-
         const serialize = (action: AnyAction) => {
             return serializeAction(action, options.abiProvider)
         }
 
         // set the request data
         if (args.identity !== undefined) {
-            data.req = ['identity', args.identity]
+            if (args.identity.scope) {
+                version = 3
+            }
+            data.req = ['identity', this.identityType(version).from(args.identity)]
         } else if (args.action && !args.actions && !args.transaction) {
             data.req = ['action', await serialize(args.action)]
         } else if (args.actions && !args.action && !args.transaction) {
@@ -338,7 +363,7 @@ export class SigningRequest {
         // request flags and callback
         const flags = RequestFlags.from(0)
         let callback = ''
-        flags.broadcast = args.broadcast !== undefined ? args.broadcast : true
+        flags.broadcast = args.broadcast !== undefined ? args.broadcast : data.req[0] !== 'identity'
         if (typeof args.callback === 'string') {
             callback = args.callback
         } else if (typeof args.callback === 'object') {
@@ -362,9 +387,10 @@ export class SigningRequest {
                 }
             }
         }
+
         const req = new SigningRequest(
-            ProtocolVersion,
-            RequestData.from(data),
+            version,
+            this.storageType(version).from(data),
             options.zlib,
             options.abiProvider
         )
@@ -448,7 +474,7 @@ export class SigningRequest {
         data = Bytes.from(data)
         const header = data.array[0]
         const version = header & ~(1 << 7)
-        if (version !== ProtocolVersion) {
+        if (version !== 2 && version !== 3) {
             throw new Error('Unsupported protocol version')
         }
         let payload = data.droppingFirst(1)
@@ -459,9 +485,9 @@ export class SigningRequest {
             payload = Bytes.from(options.zlib.inflateRaw(payload.array))
         }
         const decoder = new ABIDecoder(payload.array)
-        const req = Serializer.decode({data: decoder, type: RequestData}) as RequestData
+        const req = Serializer.decode({data: decoder, type: this.storageType(version)})
         let sig: RequestSignature | undefined
-        if (decoder.canRead(1)) {
+        if (decoder.canRead()) {
             sig = Serializer.decode({data: decoder, type: RequestSignature}) as RequestSignature
         }
         return new SigningRequest(version, req, options.zlib, options.abiProvider, sig)
@@ -471,7 +497,7 @@ export class SigningRequest {
     public version: number
 
     /** The raw signing request data. */
-    public data: RequestData
+    public data: RequestDataV2 | RequestDataV3
 
     /** The request signature. */
     public signature?: RequestSignature
@@ -485,12 +511,12 @@ export class SigningRequest {
      */
     constructor(
         version: number,
-        data: RequestData,
+        data: RequestDataV2 | RequestDataV3,
         zlib?: ZlibProvider,
         abiProvider?: AbiProvider,
         signature?: RequestSignature
     ) {
-        if (data.flags.broadcast && data.req.toJSON()[0] === 'identity') {
+        if (data.flags.broadcast && data.req.variantName === 'identity') {
             throw new Error('Invalid request (identity request cannot be broadcast)')
         }
         this.version = version
@@ -618,7 +644,7 @@ export class SigningRequest {
         const abis = new Map<string, any>()
         await Promise.all(
             this.getRequiredAbis().map(async (account) => {
-                abis.set(account.toString(), await provider.getAbi(account))
+                abis.set(account.toString(), ABI.from(await provider.getAbi(account)))
             })
         )
         return abis
@@ -633,7 +659,7 @@ export class SigningRequest {
         return this.getRawActions().map((rawAction) => {
             let abi: ABI
             if (isIdentity(rawAction)) {
-                abi = identityAbi
+                abi = (this.constructor as typeof SigningRequest).identityAbi(this.version)
             } else {
                 const rawAbi = abis.get(rawAction.account.toString())
                 if (!rawAbi) {
@@ -715,9 +741,7 @@ export class SigningRequest {
                 ctx.ref_block_prefix !== undefined &&
                 ctx.timestamp !== undefined
             ) {
-                const sec = UInt32.from(ctx.expire_seconds !== undefined ? ctx.expire_seconds : 60)
-                const expMs = TimePointSec.from(ctx.timestamp).toMilliseconds() + sec.value * 1000
-                tx.expiration = TimePointSec.fromMilliseconds(expMs)
+                tx.expiration = expirationTime(ctx.timestamp, ctx.expire_seconds)
                 tx.ref_block_num = UInt16.from(ctx.block_num)
                 tx.ref_block_prefix = UInt32.from(ctx.ref_block_prefix)
             } else {
@@ -725,6 +749,9 @@ export class SigningRequest {
                     'Invalid transaction context, need either a reference block or explicit TaPoS values'
                 )
             }
+        } else if (this.isIdentity() && this.version > 2) {
+            // From ESR version 3 all identity requests have expiration
+            tx.expiration = expirationTime(ctx.timestamp, ctx.expire_seconds)
         }
         const actions = this.resolveActions(abis, signer)
         // TODO: resolve context free actions
@@ -735,16 +762,15 @@ export class SigningRequest {
     public resolve(abis: AbiMap, signer: PermissionLevelType, ctx: TransactionContext = {}) {
         const tx = this.resolveTransaction(abis, signer, ctx)
         const actions = tx.actions.map((action) => {
-            let contractAbi: any
+            let abi: ABI | undefined
             if (isIdentity(action)) {
-                contractAbi = identityAbi
+                abi = (this.constructor as typeof SigningRequest).identityAbi(this.version)
             } else {
-                contractAbi = abis.get(action.account.toString())
+                abi = abis.get(action.account.toString())
             }
-            if (!contractAbi) {
+            if (!abi) {
                 throw new Error(`Missing ABI definition for ${action.account}`)
             }
-            const abi = ABI.from(contractAbi)
             const type = abi.getActionType(action.name)!
             const data = Serializer.encode({object: action.data, type, abi})
             return Action.from({...action, data})
@@ -770,21 +796,38 @@ export class SigningRequest {
             case 'action[]':
                 return req.value as Action[]
             case 'identity': {
-                const id = req.value as Identity
-                let data: BytesType = '0101000000000000000200000000000000' // placeholder permission
-                let authorization: PermissionLevelType[] = [PlaceholderAuth]
-                if (id.permission) {
-                    data = Serializer.encode({object: id})
-                    authorization = [id.permission]
+                if (this.version === 2) {
+                    const id = req.value as IdentityV2
+                    let data: BytesType = '0101000000000000000200000000000000' // placeholder permission
+                    let authorization: PermissionLevelType[] = [PlaceholderAuth]
+                    if (id.permission) {
+                        data = Serializer.encode({object: id})
+                        authorization = [id.permission]
+                    }
+                    return [
+                        Action.from({
+                            account: '',
+                            name: 'identity',
+                            authorization,
+                            data,
+                        }),
+                    ]
+                } else {
+                    // eslint-disable-next-line prefer-const
+                    let {scope, permission} = req.value as IdentityV3
+                    if (!permission) {
+                        permission = PlaceholderAuth
+                    }
+                    const data = Serializer.encode({object: {scope, permission}, type: IdentityV3})
+                    return [
+                        Action.from({
+                            account: '',
+                            name: 'identity',
+                            authorization: [permission],
+                            data,
+                        }),
+                    ]
                 }
-                return [
-                    Action.from({
-                        account: '',
-                        name: 'identity',
-                        authorization,
-                        data,
-                    }),
-                ]
             }
             case 'transaction':
                 return (req.value as Transaction).actions
@@ -840,8 +883,8 @@ export class SigningRequest {
         if (!this.isIdentity()) {
             return null
         }
-        const id = this.data.req.value as Identity
-        if (id.permission && id.permission.actor.equals(PlaceholderName)) {
+        const id = this.data.req.value as IdentityV2
+        if (id.permission && !id.permission.actor.equals(PlaceholderName)) {
             return id.permission.actor
         }
         return null
@@ -856,11 +899,24 @@ export class SigningRequest {
         if (!this.isIdentity()) {
             return null
         }
-        const id = this.data.req.value as Identity
-        if (id.permission && id.permission.permission.equals(PlaceholderPermission)) {
+        const id = this.data.req.value as IdentityV2
+        if (id.permission && !id.permission.permission.equals(PlaceholderPermission)) {
             return id.permission.permission
         }
         return null
+    }
+
+    /**
+     * Present if the request is an identity request and requests a specific permission.
+     * @note This returns `nil` unless a specific permission has been requested,
+     *       use `isIdentity` to check id requests.
+     */
+    public getIdentityScope(): Name | null {
+        if (!this.isIdentity() || this.version <= 2) {
+            return null
+        }
+        const id = this.data.req.value as IdentityV3
+        return id.scope
     }
 
     /** Get raw info dict */
@@ -908,6 +964,7 @@ export class SigningRequest {
         if (this.signature) {
             signature = RequestSignature.from(JSON.parse(JSON.stringify(this.signature)))
         }
+        const RequestData = (this.constructor as typeof SigningRequest).storageType(this.version)
         const data = RequestData.from(JSON.parse(JSON.stringify(this.data)))
         return new SigningRequest(this.version, data, this.zlib, this.abiProvider, signature)
     }
@@ -1010,9 +1067,7 @@ async function serializeAction(action: AnyAction, abiProvider?: AbiProvider) {
     if (Bytes.isBytes(action.data) || (action.data.constructor as any).abiName !== undefined) {
         return Action.from(action)
     }
-    if (isIdentity(action)) {
-        return Action.from({...action, data: Identity.from(action.data)})
-    } else if (abiProvider) {
+    if (abiProvider) {
         const abiData = await abiProvider.getAbi(Name.from(action.account))
         return Action.from(action, abiData)
     } else {
@@ -1032,4 +1087,10 @@ function hasTapos(tx: Transaction) {
         tx.ref_block_num.value === 0 &&
         tx.ref_block_prefix.value === 0
     )
+}
+
+function expirationTime(timestamp?: TimePointType, expireSeconds: UInt32Type = 60) {
+    const ts = TimePointSec.from(timestamp || new Date())
+    const exp = UInt32.from(expireSeconds)
+    return TimePointSec.fromMilliseconds(ts.toMilliseconds() + exp.value * 1000)
 }

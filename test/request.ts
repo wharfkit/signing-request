@@ -1,14 +1,13 @@
 import * as assert from 'assert'
 import 'mocha'
-import {TextDecoder, TextEncoder} from 'util'
 
 import abiProvider from './utils/mock-abi-provider'
 import mockAbiProvider from './utils/mock-abi-provider'
 import zlib from './utils/node-zlib-provider'
 
-import {SignatureProvider, SigningRequestEncodingOptions} from '../src'
+import {IdentityV3, SignatureProvider, SigningRequestEncodingOptions} from '../src'
 import * as TSModule from '../src'
-import {Serializer} from 'eosio-core'
+import {Bytes, Name, Serializer, UInt64} from 'eosio-core'
 
 let {SigningRequest, PlaceholderAuth, PlaceholderName} = TSModule
 if (process.env['TEST_UMD']) {
@@ -540,6 +539,30 @@ describe('signing request', function () {
         const expected =
             'https://example.com?tx=6aff5c203810ff6b40469fe20318856354889ff037f4cf5b89a157514a43e825&bn=1234'
         assert.equal(callback!.url, expected)
+    })
+
+    it('should handle scoped id requests', async function () {
+        const scope = Name.from(UInt64.from('18446744073709551615'))
+        const req = await SigningRequest.create(
+            {
+                identity: {scope},
+                callback: {url: 'https://example.com', background: true},
+            },
+            options
+        )
+        assert.equal(req.encode(), 'esr://g2NgZP4PBQxMwhklJQXFVvr6qRWJuQU5qXrJ-bkMAA')
+        const decoded = SigningRequest.from(
+            'esr://g2NgZP4PBQxMwhklJQXFVvr6qRWJuQU5qXrJ-bkMAA',
+            options
+        )
+        assert.equal(decoded.data.equals(req.data), true)
+        assert.equal(decoded.getIdentityScope()!.toString(), scope.toString())
+        const resolved = req.resolve(new Map(), {actor: 'foo', permission: 'active'})
+        assert.equal(resolved.transaction.expiration.toMilliseconds() > Date.now(), true)
+        assert.equal(
+            resolved.transaction.actions[0].data.hexString,
+            'ffffffffffffffff01000000000000285d00000000a8ed3232'
+        )
     })
 })
 
