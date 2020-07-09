@@ -1,6 +1,6 @@
 {
     "name": "eosio-signing-request",
-    "version": "2.0.0-beta2",
+    "version": "2.0.0-beta3",
     "description": "EOSIO Signing Request (ESR / EEP-7) encoder and decoder",
     "license": "MIT",
     "main": "lib/index.js",
