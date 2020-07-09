@@ -16,7 +16,7 @@
         "prepare": "make -j4"
     },
     "dependencies": {
-        "eosio-core": "0.0.2"
+        "@greymass/eosio": "latest"
     },
     "devDependencies": {
         "@types/elliptic": "^6.4.12",

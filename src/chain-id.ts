@@ -1,4 +1,4 @@
-import {Checksum256, Checksum256Type, TypeAlias, UInt8, Variant} from 'eosio-core'
+import {Checksum256, Checksum256Type, TypeAlias, UInt8, Variant} from '@greymass/eosio'
 
 /** Chain ID aliases. */
 export enum ChainName {

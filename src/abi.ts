@@ -11,7 +11,7 @@ import {
     TypeAlias,
     UInt8,
     Variant,
-} from 'eosio-core'
+} from '@greymass/eosio'
 
 import {ChainIdVariant} from './chain-id'
 

@@ -32,7 +32,7 @@ import {
     UInt32Type,
     UInt8,
     VarUInt,
-} from 'eosio-core'
+} from '@greymass/eosio'
 
 import * as base64u from './base64u'
 import {ChainAlias, ChainId, ChainIdType, ChainName} from './chain-id'

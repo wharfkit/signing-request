@@ -5,9 +5,9 @@ import abiProvider from './utils/mock-abi-provider'
 import mockAbiProvider from './utils/mock-abi-provider'
 import zlib from './utils/node-zlib-provider'
 
-import {IdentityV3, SignatureProvider, SigningRequestEncodingOptions} from '../src'
+import {SignatureProvider, SigningRequestEncodingOptions} from '../src'
 import * as TSModule from '../src'
-import {Bytes, Name, Serializer, UInt64} from 'eosio-core'
+import {Name, Serializer, UInt64} from '@greymass/eosio'
 
 let {SigningRequest, PlaceholderAuth, PlaceholderName} = TSModule
 if (process.env['TEST_UMD']) {
