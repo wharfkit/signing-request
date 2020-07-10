@@ -751,7 +751,9 @@ export class SigningRequest {
             }
         } else if (this.isIdentity() && this.version > 2) {
             // From ESR version 3 all identity requests have expiration
-            tx.expiration = expirationTime(ctx.timestamp, ctx.expire_seconds)
+            tx.expiration = ctx.expiration
+                ? TimePointSec.from(ctx.expiration)
+                : expirationTime(ctx.timestamp, ctx.expire_seconds)
         }
         const actions = this.resolveActions(abis, signer)
         // TODO: resolve context free actions

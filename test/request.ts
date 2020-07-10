@@ -557,11 +557,19 @@ describe('signing request', function () {
         )
         assert.equal(decoded.data.equals(req.data), true)
         assert.equal(decoded.getIdentityScope()!.toString(), scope.toString())
-        const resolved = req.resolve(new Map(), {actor: 'foo', permission: 'active'})
-        assert.equal(resolved.transaction.expiration.toMilliseconds() > Date.now(), true)
+        const resolved = req.resolve(
+            new Map(),
+            {actor: 'foo', permission: 'active'},
+            {expiration: '2020-07-10T08:40:20'}
+        )
+        assert.equal(resolved.transaction.expiration.toString(), '2020-07-10T08:40:20')
         assert.equal(
             resolved.transaction.actions[0].data.hexString,
             'ffffffffffffffff01000000000000285d00000000a8ed3232'
+        )
+        assert.equal(
+            resolved.transaction.signingDigest(req.getChainId()).hexString,
+            '70d1fd5bda1998135ed44cbf26bd1cc2ed976219b2b6913ac13f41d4dd013307'
         )
     })
 })
