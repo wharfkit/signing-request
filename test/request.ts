@@ -5,9 +5,14 @@ import abiProvider from './utils/mock-abi-provider'
 import mockAbiProvider from './utils/mock-abi-provider'
 import zlib from './utils/node-zlib-provider'
 
-import {SignatureProvider, SigningRequestEncodingOptions} from '../src'
+import {
+    ChainName,
+    ResolvedSigningRequest,
+    SignatureProvider,
+    SigningRequestEncodingOptions,
+} from '../src'
 import * as TSModule from '../src'
-import {Name, Serializer, UInt64} from '@greymass/eosio'
+import {Name, PrivateKey, Serializer, UInt64} from '@greymass/eosio'
 
 let {SigningRequest, PlaceholderAuth, PlaceholderName} = TSModule
 if (process.env['TEST_UMD']) {
@@ -568,8 +573,60 @@ describe('signing request', function () {
             'ffffffffffffffff01000000000000285d00000000a8ed3232'
         )
         assert.equal(
-            resolved.transaction.signingDigest(req.getChainId()).hexString,
+            resolved.signingDigest.hexString,
             '70d1fd5bda1998135ed44cbf26bd1cc2ed976219b2b6913ac13f41d4dd013307'
+        )
+    })
+
+    it('should handle multi-chain id requests', async function () {
+        this.slow(200)
+        const req = SigningRequest.identity({
+            chainId: null,
+            chainIds: [ChainName.EOS, ChainName.WAX],
+            scope: 'foo',
+            callback: {
+                url: 'myapp://login={{cid}}',
+                background: false,
+            },
+        })
+        assert.equal(req.isMultiChain(), true)
+        assert.deepEqual(req.getChainIds()!.map(String), [
+            'aca376f206b8fc25a6ed44dbdc66547c36c6c33e3a119ffbeaef943642f0e906',
+            '1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4',
+        ])
+        const resolved = req.resolve(
+            new Map(),
+            {actor: 'foo', permission: 'active'},
+            {
+                expiration: '2020-07-10T08:40:20',
+                chainId: '1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4',
+            }
+        )
+        const key = PrivateKey.from('PVT_K1_2wFL8Ne8JoGrxz6GdnfB7d4yhUYpqNgubHeKUC64qT3XE6Ro84')
+        const sig = key.signDigest(resolved.signingDigest)
+        const callback = resolved.getCallback([sig])
+        assert.deepEqual(callback, {
+            background: false,
+            payload: {
+                sig:
+                    'SIG_K1_K4nkCupUx3hDXSHq4rhGPpDMPPPjJyvmF3M6j7ppYUzkR3L93endwnxf3YhJSG4SSvxxU1ytD8hj39kukTeYxjwy5H3XNJ',
+                tx: 'b8e921a7b68d7309847e633d74963f25eb5a7d0b15b1aceb143723c234686a8d',
+                rbn: '0',
+                rid: '0',
+                ex: '2020-07-10T08:40:20',
+                req:
+                    'esr://AwAAAwAAAAAAAChdAAAVbXlhcHA6Ly9sb2dpbj17e2NpZH19AQljaGFpbl9pZHMFAgABAAo',
+                sa: 'foo',
+                sp: 'active',
+                cid: '1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4',
+            },
+            url: 'myapp://login=1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4',
+        })
+        const recreated = await ResolvedSigningRequest.fromPayload(callback!.payload)
+        assert.equal(recreated.request.encode(), req.encode())
+        assert.equal(
+            recreated.chainId.hexString,
+            '1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4'
         )
     })
 })

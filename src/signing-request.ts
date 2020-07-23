@@ -35,7 +35,7 @@ import {
 } from '@greymass/eosio'
 
 import * as base64u from './base64u'
-import {ChainAlias, ChainId, ChainIdType, ChainName} from './chain-id'
+import {ChainAlias, ChainId, ChainIdType, ChainIdVariant, ChainName} from './chain-id'
 import {
     IdentityV2,
     IdentityV3,
@@ -137,6 +137,8 @@ export interface TransactionContext {
     ref_block_prefix?: UInt32Type
     /** Expiration timestamp, takes precedence over timestamp and expire_seconds if set. */
     expiration?: TimePointType
+    /** Chain ID to resolve for, required for multi-chain requests. */
+    chainId?: ChainIdType
 }
 
 /**
@@ -212,7 +214,22 @@ export interface ResolvedTransaction {
 
 export type CallbackType = string | {url: string; background: boolean}
 
-export interface SigningRequestCreateArguments {
+interface SigningRequestCommonArguments {
+    /**
+     * Chain ID to use, can be set to `null` for a multi-chain request.
+     * Defaults to EOS if omitted.
+     */
+    chainId?: ChainIdType | null
+    /**
+     * Chain IDs to constrain a multi-chain request to.
+     * Only considered if `chainId` is explicitly set to `null.
+     */
+    chainIds?: ChainIdType[]
+    /** Optional metadata to pass along with the request. */
+    info?: {[key: string]: Bytes | ABISerializable}
+}
+
+export interface SigningRequestCreateArguments extends SigningRequestCommonArguments {
     /** Single action to create request with. */
     action?: AnyAction
     /** Multiple actions to create request with. */
@@ -227,8 +244,6 @@ export interface SigningRequestCreateArguments {
         scope?: NameType
         permission?: PermissionLevelType
     }
-    /** Chain to use, defaults to EOS main-net if omitted. */
-    chainId?: string | number
     /** Whether wallet should broadcast tx, defaults to true. */
     broadcast?: boolean
     /**
@@ -236,17 +251,13 @@ export interface SigningRequestCreateArguments {
      * broadcasting or signing. Passing a string means background = false.
      */
     callback?: CallbackType
-    /** Optional metadata to pass along with the request. */
-    info?: {[key: string]: Bytes | ABISerializable}
 }
 
-export interface SigningRequestCreateIdentityArguments {
+export interface SigningRequestCreateIdentityArguments extends SigningRequestCommonArguments {
     /**
      * Callback where the identity should be delivered.
      */
     callback: CallbackType
-    /** Chain to use, defaults to EOS if omitted. */
-    chainId?: BytesType | ChainAlias
     /**
      * Requested account name of identity.
      * Defaults to placeholder (any identity) if omitted.
@@ -261,8 +272,6 @@ export interface SigningRequestCreateIdentityArguments {
      * Scope for the request.
      */
     scope?: NameType
-    /** Optional metadata to pass along with the request. */
-    info?: {[key: string]: Bytes | ABISerializable}
 }
 
 export interface SigningRequestEncodingOptions {
@@ -345,6 +354,11 @@ export class SigningRequest {
         const data: any = {}
         const encode = (action: AnyAction) => encodeAction(action, abis)
 
+        // multi-chain requests requires version 3
+        if (args.chainId === null) {
+            version = 3
+        }
+
         // set the request data
         if (args.identity !== undefined) {
             if (args.identity.scope) {
@@ -402,7 +416,11 @@ export class SigningRequest {
         }
 
         // set the chain id
-        data.chain_id = ChainId.from(args.chainId || ChainName.EOS).chainVariant
+        if (args.chainId === null) {
+            data.chain_id = ChainIdVariant.from(['chain_alias', 0])
+        } else {
+            data.chain_id = ChainId.from(args.chainId || ChainName.EOS).chainVariant
+        }
 
         // request flags and callback
         const flags = RequestFlags.from(0)
@@ -430,6 +448,13 @@ export class SigningRequest {
                     data.info.push({key, value})
                 }
             }
+        }
+        if (args.chainIds && args.chainId === null) {
+            const ids = args.chainIds.map((id) => ChainId.from(id).chainVariant)
+            data.info.push({
+                key: 'chain_ids',
+                value: Serializer.encode({object: ids, type: {type: ChainIdVariant, array: true}}),
+            })
         }
 
         const req = new SigningRequest(
@@ -464,13 +489,12 @@ export class SigningRequest {
         }
         return this.createSync(
             {
+                ...args,
                 identity: {
                     permission,
                     scope: args.scope,
                 },
                 broadcast: false,
-                callback: args.callback,
-                info: args.info,
             },
             options
         )
@@ -682,17 +706,22 @@ export class SigningRequest {
 
     /** Resolve required ABI definitions. */
     public async fetchAbis(abiProvider?: AbiProvider): Promise<AbiMap> {
-        const provider = abiProvider || this.abiProvider
-        if (!provider) {
-            throw new Error('Missing ABI provider')
+        const required = this.getRequiredAbis()
+        if (required.length > 0) {
+            const provider = abiProvider || this.abiProvider
+            if (!provider) {
+                throw new Error('Missing ABI provider')
+            }
+            const abis = new Map<string, any>()
+            await Promise.all(
+                required.map(async (account) => {
+                    abis.set(account.toString(), ABI.from(await provider.getAbi(account)))
+                })
+            )
+            return abis
+        } else {
+            return new Map()
         }
-        const abis = new Map<string, any>()
-        await Promise.all(
-            this.getRequiredAbis().map(async (account) => {
-                abis.set(account.toString(), ABI.from(await provider.getAbi(account)))
-            })
-        )
-        return abis
     }
 
     /**
@@ -823,7 +852,26 @@ export class SigningRequest {
             return Action.from({...action, data})
         })
         const transaction = Transaction.from({...tx, actions})
-        return new ResolvedSigningRequest(this, PermissionLevel.from(signer), transaction, tx)
+        let chainId: ChainId
+        if (this.isMultiChain()) {
+            if (!ctx.chainId) {
+                throw new Error('Missing chosen chain ID for multi-chain request')
+            }
+            chainId = ChainId.from(ctx.chainId)
+            const ids = this.getChainIds()
+            if (ids && !ids.some((id) => chainId.equals(id))) {
+                throw new Error('Trying to resolve for chain ID not defined in request')
+            }
+        } else {
+            chainId = this.getChainId()
+        }
+        return new ResolvedSigningRequest(
+            this,
+            PermissionLevel.from(signer),
+            transaction,
+            tx,
+            chainId
+        )
     }
 
     /**
@@ -832,6 +880,40 @@ export class SigningRequest {
      */
     public getChainId(): ChainId {
         return this.data.chain_id.chainId
+    }
+
+    /**
+     * Chain IDs this request is valid for, only valid for multi chain requests. Value of `null` when `isMultiChain` is true denotes any chain.
+     */
+    public getChainIds(): ChainId[] | null {
+        if (!this.isMultiChain()) {
+            return null
+        }
+        const ids = this.getInfoKey('chain_ids', {type: ChainIdVariant, array: true}) as
+            | ChainIdVariant[]
+            | undefined
+        if (ids) {
+            return ids.map((id) => id.chainId)
+        }
+        return null
+    }
+
+    /**
+     * Set chain IDs this request is valid for, only considered for multi chain requests.
+     */
+    public setChainIds(ids: ChainIdType[]) {
+        const value = ids.map((id) => ChainId.from(id).chainVariant)
+        this.setInfoKey('chain_ids', value, {type: ChainIdVariant, array: true})
+    }
+
+    /**
+     * True if chainId is set to chain alias `0` which indicates that the request is valid for any chain.
+     */
+    public isMultiChain(): boolean {
+        return (
+            this.data.chain_id.variantIdx === 0 &&
+            (this.data.chain_id.value as ChainAlias).value === ChainName.UNKNOWN
+        )
     }
 
     /** Return the actions in this request with action data encoded. */
@@ -1042,6 +1124,7 @@ export class ResolvedSigningRequest {
                 ref_block_num: payload.rbn,
                 ref_block_prefix: payload.rid,
                 expiration: payload.ex,
+                chainId: payload.cid,
             }
         )
     }
@@ -1054,21 +1137,29 @@ export class ResolvedSigningRequest {
     public readonly transaction: Transaction
     /** Transaction object with action data decoded. */
     public readonly resolvedTransaction: ResolvedTransaction
+    /** Id of chain where the request was resolved. */
+    public readonly chainId: ChainId
 
     constructor(
         request: SigningRequest,
         signer: PermissionLevel,
         transaction: Transaction,
-        resolvedTransaction: ResolvedTransaction
+        resolvedTransaction: ResolvedTransaction,
+        chainId: ChainId
     ) {
         this.request = request
         this.signer = signer
         this.transaction = transaction
         this.resolvedTransaction = resolvedTransaction
+        this.chainId = chainId
     }
 
     public get serializedTransaction(): Uint8Array {
         return Serializer.encode({object: this.transaction}).array
+    }
+
+    public get signingDigest(): Checksum256 {
+        return this.transaction.signingDigest(this.chainId)
     }
 
     public getCallback(
@@ -1092,6 +1183,7 @@ export class ResolvedSigningRequest {
             req: this.request.encode(),
             sa: String(this.signer.actor),
             sp: String(this.signer.permission),
+            cid: String(this.chainId),
         }
         for (const [n, sig] of sigs.slice(1).entries()) {
             payload[`sig${n}`] = String(sig)
