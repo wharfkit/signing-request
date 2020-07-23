@@ -257,6 +257,10 @@ export interface SigningRequestCreateIdentityArguments {
      * Defaults to placeholder (any permission) if omitted.
      */
     permission?: NameType
+    /**
+     * Scope for the request.
+     */
+    scope?: NameType
     /** Optional metadata to pass along with the request. */
     info?: {[key: string]: Bytes | ABISerializable}
 }
@@ -295,11 +299,51 @@ export class SigningRequest {
         args: SigningRequestCreateArguments,
         options: SigningRequestEncodingOptions = {}
     ) {
+        let actions: AnyAction[]
+        if (args.action) {
+            actions = [args.action]
+        } else if (args.actions) {
+            actions = args.actions
+        } else if (args.transaction) {
+            actions = args.transaction.actions || []
+        } else {
+            actions = []
+        }
+        const requiredAbis = actions
+            .filter(
+                (action) =>
+                    !Bytes.isBytes(action.data) &&
+                    (action.data.constructor as any).abiName === undefined
+            )
+            .map((action) => Name.from(action.account))
+        const abis: Record<string, ABIDef> = {}
+        if (requiredAbis.length > 0) {
+            const provider = options.abiProvider
+            if (!provider) {
+                throw new Error('Missing abi provider')
+            }
+            const accountAbis = await Promise.all(
+                requiredAbis.map((account) => provider.getAbi(account))
+            )
+            for (const [idx, abi] of accountAbis.entries()) {
+                abis[requiredAbis[idx].toString()] = abi
+            }
+        }
+        return this.createSync(args, options, abis)
+    }
+
+    /**
+     * Synchronously create a new signing request.
+     * @throws If an un-encoded action with no abi def is encountered.
+     */
+    public static createSync(
+        args: SigningRequestCreateArguments,
+        options: SigningRequestEncodingOptions = {},
+        abis: Record<string, ABIDef> = {}
+    ) {
         let version = 2
         const data: any = {}
-        const serialize = (action: AnyAction) => {
-            return serializeAction(action, options.abiProvider)
-        }
+        const encode = (action: AnyAction) => encodeAction(action, abis)
 
         // set the request data
         if (args.identity !== undefined) {
@@ -308,12 +352,12 @@ export class SigningRequest {
             }
             data.req = ['identity', this.identityType(version).from(args.identity)]
         } else if (args.action && !args.actions && !args.transaction) {
-            data.req = ['action', await serialize(args.action)]
+            data.req = ['action', encode(args.action)]
         } else if (args.actions && !args.action && !args.transaction) {
             if (args.actions.length === 1) {
-                data.req = ['action', await serialize(args.actions[0])]
+                data.req = ['action', encode(args.actions[0])]
             } else {
-                data.req = ['action[]', await Promise.all(args.actions.map(serialize))]
+                data.req = ['action[]', args.actions.map(encode)]
             }
         } else if (args.transaction && !args.action && !args.actions) {
             const tx = args.transaction
@@ -349,7 +393,7 @@ export class SigningRequest {
                 tx.context_free_actions = []
             }
             // encode actions if needed
-            tx.actions = await Promise.all(tx.actions.map(serialize))
+            tx.actions = tx.actions.map(encode)
             data.req = ['transaction', tx]
         } else {
             throw new TypeError(
@@ -418,10 +462,11 @@ export class SigningRequest {
         ) {
             permission = undefined
         }
-        return this.create(
+        return this.createSync(
             {
                 identity: {
                     permission,
+                    scope: args.scope,
                 },
                 broadcast: false,
                 callback: args.callback,
@@ -1065,16 +1110,15 @@ export class ResolvedSigningRequest {
     }
 }
 
-async function serializeAction(action: AnyAction, abiProvider?: AbiProvider) {
+function encodeAction(action: AnyAction, abis: Record<string, ABIDef>): Action {
     if (Bytes.isBytes(action.data) || (action.data.constructor as any).abiName !== undefined) {
         return Action.from(action)
     }
-    if (abiProvider) {
-        const abiData = await abiProvider.getAbi(Name.from(action.account))
-        return Action.from(action, abiData)
-    } else {
-        throw new Error('Missing abi provider')
+    const abi = abis[String(Name.from(action.account))]
+    if (!abi) {
+        throw new Error(`Missing abi for ${action.account}`)
     }
+    return Action.from(action, abi)
 }
 
 function isIdentity(action: AnyAction) {
