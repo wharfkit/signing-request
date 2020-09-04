@@ -103,7 +103,7 @@ const opts = {
 
 With the above actions established, to create the signing request itself we use the eosio-signing-request library and its `create` method. The full working example to create this request [can be found here](https://github.com/greymass/eosio-signing-request-demo/blob/master/examples/encode.js).
 
-(ES8 or TypeEcript)
+(ES8 or TypeScript)
 ```js
 const request = await SigningRequest.create({ actions }, opts)
 console.log(request)
