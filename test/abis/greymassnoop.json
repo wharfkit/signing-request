@@ -1,0 +1,23 @@
+{
+    "version": "eosio::abi/1.1",
+    "types": [],
+    "structs": [
+       {
+            "name": "noop",
+            "base": "",
+            "fields": []
+        }
+    ],
+    "actions": [
+       {
+            "name": "noop",
+            "type": "noop",
+            "ricardian_contract": "This action does nothing."
+        }
+    ],
+    "tables": [],
+    "ricardian_clauses": [],
+    "error_messages": [],
+    "abi_extensions": [],
+    "variants": []
+}

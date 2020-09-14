@@ -12,7 +12,7 @@ import {
     SigningRequestEncodingOptions,
 } from '../src'
 import * as TSModule from '../src'
-import {Name, PrivateKey, Serializer, UInt64} from '@greymass/eosio'
+import {ABI, Name, PrivateKey, Serializer, Transaction, UInt64} from '@greymass/eosio'
 
 let {SigningRequest, PlaceholderAuth, PlaceholderName} = TSModule
 if (process.env['TEST_UMD']) {
@@ -628,6 +628,40 @@ describe('signing request', function () {
             recreated.chainId.hexString,
             '1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4'
         )
+    })
+
+    it('transaction from esr payload', async function () {
+        const authorization = {
+          actor: 'foo',
+          permission: 'active'
+        }
+        const payload = 'esr:gmNcs7jsE9uOP6rL3rrcvpMWUmN27LCdleD836_eTzFz-vCSjWn21_j4XTLvzvwrZQACpgDNuRLSL6-mgjgMQA6jwNQ4uIDPMwNXBoZlTSbMrwxCgfxwXZuzZxknXL0ierHTtxikYsVbIyNFmECCUdj6Syu2eTEyQACLq38whMVknVFSUlBspa-fnKSXmJeckV-kl5OZl61vlJhqkpxiaqxraGJqpmuSmJiqa2EMIhLTLFPSUgyNU4xNmDnSSlNz4osz01ODPd3jvQ3jvU2qXNICKvIMSzLMik1SsiMjcpNy08xSzP3CA4wiAyJSys0rCzOCMkoiUl2Lk8sLA_KzAktMw7LNk1yBFpa6uRr5emVbeJiFujuGF7ukOxf6RiW5hwV65Jf7lla5chellpQW5cUXJJZkaMLcnZSTn12sl5mvX56Yk5Naol9SlJhXnJZapOyUmx7p7WVQyQLyDwsodAE'
+        // Interpret the Signing Request
+        const request = SigningRequest.from(payload, options);
+        // Retrieve ABIs for this request
+        const abis = await request.fetchAbis();
+        // Resolve the transaction
+        const resolved = request.resolve(abis, {
+            actor: 'foo',
+            permission: 'active'
+        }, {
+            timestamp: '2018-02-15T00:00:00',
+            block_num: 1234,
+            expire_seconds: 0,
+            ref_block_prefix: 56789,
+        });
+        // Emulate a generic EOSJS transaction/object
+        const plainTx = JSON.parse(JSON.stringify(resolved.transaction))
+        // Emulate EOSJS ABI retrieval
+        const eosjsABIs = await Promise.all(resolved.transaction.actions.map(async (action) => {
+            const contract = String(action.account)
+            return {
+                contract,
+                abi: JSON.stringify(abis.get(contract)),
+            };
+        }));
+        // Create transaction
+        Transaction.from(plainTx, eosjsABIs)
     })
 })
 
