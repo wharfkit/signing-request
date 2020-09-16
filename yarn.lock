@@ -869,10 +869,10 @@
     lodash "^4.17.13"
     to-fast-properties "^2.0.0"
 
-"@greymass/eosio@0.0.3":
-  version "0.0.3"
-  resolved "https://registry.yarnpkg.com/@greymass/eosio/-/eosio-0.0.3.tgz#62d1521dc0d40fdc391ae44ba8722fca908b84f4"
-  integrity sha512-M0I32H9OHiz91Ubke+2SqxFUx4Uzd/mjabc1s5WwM8/jUtAH3l5DsmWb6kmr3sr3hH6H1kjiVNE8SNMg/BUqgQ==
+"@greymass/eosio@0.0.5":
+  version "0.0.5"
+  resolved "https://registry.yarnpkg.com/@greymass/eosio/-/eosio-0.0.5.tgz#34b827ca527196c4e9b7a9293c0c70e881b06d30"
+  integrity sha512-eYToZAsARnOnlKST/eeJIDBHCHj1hVfjDNZY1/0KCRD8zkkHQPsQDfkgzR/IWZ/Cqrc2efFmYMqJCiRGzUYjzw==
   dependencies:
     bn.js "^4.4.0"
     elliptic "^6.5.2"
