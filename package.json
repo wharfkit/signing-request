@@ -1,6 +1,6 @@
 {
     "name": "eosio-signing-request",
-    "version": "2.0.0-beta6",
+    "version": "2.0.0-beta7",
     "description": "EOSIO Signing Request (ESR / EEP-7) encoder and decoder",
     "license": "MIT",
     "main": "lib/index.js",
@@ -16,7 +16,7 @@
         "prepare": "make -j4"
     },
     "dependencies": {
-        "@greymass/eosio": "^0.0.4"
+        "@greymass/eosio": "0.0.5"
     },
     "devDependencies": {
         "@types/elliptic": "^6.4.12",
