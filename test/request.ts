@@ -163,6 +163,52 @@ describe('signing request', function () {
         })
     })
 
+    it('should not fail getRawTransaction', async function () {
+        const apiResponse:any = [
+            'transaction',
+            {
+                expiration: '2020-11-14T21:10:24',
+                ref_block_num: 44767,
+                ref_block_prefix: 780338793,
+                max_net_usage_words: 0,
+                max_cpu_usage_ms: 5,
+                delay_sec: 0,
+                context_free_actions: [],
+                actions: [
+                    {
+                        account: 'greymassnoop',
+                        name: 'noop',
+                        authorization: [ { actor: 'greymassfuel', permission: 'cosign' } ],
+                        data: ''
+                    },
+                    {
+                        account: 'eosio.token',
+                        name: 'transfer',
+                        authorization: [ { actor: 'ihasnocpunet', permission: 'active' } ],
+                        data: '90d5d415d1894d73000000403210955e2e0000000000000004454f5300000000107265663d7465616d677265796d617373'
+                    },
+                    {
+                        account: 'eosio.token',
+                        name: 'transfer',
+                        authorization: [ { actor: 'ihasnocpunet', permission: 'active' } ],
+                        data: '90d5d415d1894d7380b1915e5d268dca010000000000000004454f530000000000'
+                    }
+                ],
+                transaction_extensions: []
+            }
+        ]
+        const request = await SigningRequest.create(
+            {
+                broadcast: false,
+                callback: 'https://example.com/?tx={{tx}}',
+                transaction: apiResponse[1],
+            },
+            options
+        )
+        request.data.req = apiResponse
+        const test = request.getRawTransaction()
+    })
+
     it('should create from uri', async function () {
         const request = await SigningRequest.from(
             'esr://gmNgZGBY1mTC_MoglIGBIVzX5uxZRqAQGMBoExgDAjRi4fwAVz93ICUckpGYl12skJZfpFCSkaqQllmcwczAAAA',
