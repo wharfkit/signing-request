@@ -12,7 +12,7 @@ import {
     SigningRequestEncodingOptions,
 } from '../src'
 import * as TSModule from '../src'
-import {Name, PrivateKey, Serializer, UInt64} from '@greymass/eosio'
+import {Name, PrivateKey, Serializer, Signature, UInt64} from '@greymass/eosio'
 
 let {SigningRequest, PlaceholderAuth, PlaceholderName} = TSModule
 if (process.env['TEST_UMD']) {
@@ -460,10 +460,20 @@ describe('signing request', function () {
             },
             options
         )
+        req.setInfoKey(
+            'extra_sig',
+            'SIG_K1_K4nkCupUx3hDXSHq4rhGPpDMPPPjJyvmF3M6j7ppYUzkR3L93endwnxf3YhJSG4SSvxxU1ytD8hj39kukTeYxjwy5H3XNJ',
+            Signature
+        )
         const decoded = SigningRequest.from(req.encode(), options)
         assert.deepStrictEqual(decoded.getRawInfoKey('foo'), req.getRawInfoKey('foo'))
         assert.deepStrictEqual(decoded.getRawInfoKey('foo'), req.getRawInfoKey('foo'))
-        // assert.deepStrictEqual(decoded.getInfo(), {foo: 'bar', baz: '\u0000\u0001\u0002'})
+        assert.deepStrictEqual(decoded.getInfoKey('foo'), 'bar')
+        assert.deepStrictEqual(decoded.getInfoKey('baz', 'string'), 'hello')
+        assert.deepStrictEqual(
+            String(decoded.getInfoKey('extra_sig', Signature)),
+            'SIG_K1_K4nkCupUx3hDXSHq4rhGPpDMPPPjJyvmF3M6j7ppYUzkR3L93endwnxf3YhJSG4SSvxxU1ytD8hj39kukTeYxjwy5H3XNJ'
+        )
     })
 
     it('should template callback url', async function () {

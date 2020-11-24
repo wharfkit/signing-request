@@ -8,6 +8,7 @@ import {
     ABIDef,
     ABIEncoder,
     ABISerializable,
+    ABISerializableConstructor,
     ABISerializableType,
     Action,
     AnyAction,
@@ -442,7 +443,9 @@ export class SigningRequest {
                 const isOwn = Object.prototype.hasOwnProperty.call(args.info, key)
                 if (isOwn) {
                     let value = args.info[key]
-                    if (!(value instanceof Bytes)) {
+                    if (typeof value === 'string') {
+                        value = Bytes.from(value, 'utf8')
+                    } else if (!(value instanceof Bytes)) {
                         value = Serializer.encode({object: value})
                     }
                     data.info.push({key, value})
@@ -1075,15 +1078,31 @@ export class SigningRequest {
     }
 
     /** Set a metadata key. */
-    public setInfoKey(key: string, object: any, type?: ABISerializableType) {
-        this.setRawInfoKey(key, Serializer.encode({object, type}))
+    public setInfoKey(key: string, object: ABISerializable, type?: ABISerializableType) {
+        let data: Bytes
+        if (typeof object === 'string' && !type) {
+            // match old behavior where strings encode to raw utf8 as opposed to
+            // eosio-abi encoded strings (varuint32 length prefix + utf8 bytes)
+            data = Bytes.from(object, 'utf8')
+        } else {
+            data = Serializer.encode({object, type})
+        }
+        this.setRawInfoKey(key, data)
     }
 
     /** Get a metadata key. */
-    public getInfoKey<T extends ABISerializable>(key: string, type: ABISerializableType) {
+    public getInfoKey(key: string): string
+    public getInfoKey<T extends ABISerializableConstructor>(key: string, type: T): InstanceType<T>
+    public getInfoKey(key: string, type: ABISerializableType): any
+    public getInfoKey(key: string, type?: ABISerializableType): any {
         const data = this.getRawInfoKey(key)
         if (data) {
-            return Serializer.decode({data, type}) as T
+            if (type) {
+                return Serializer.decode({data, type})
+            } else {
+                // assume utf8 string if no type is given
+                return data.utf8String
+            }
         }
     }
 
