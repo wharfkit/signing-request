@@ -51,7 +51,7 @@ describe('signing request', function () {
                     name: 'transfer',
                     authorization: [{actor: 'foo', permission: 'active'}],
                     data:
-                        '000000000000285d000000000000ae39e80300000000000003454f53000000000b68656c6c6f207468657265',
+                    '000000000000285d000000000000ae39e80300000000000003454f53000000000b68656c6c6f207468657265',
                 },
             ],
             callback: '',
@@ -94,14 +94,14 @@ describe('signing request', function () {
                         name: 'transfer',
                         authorization: [{actor: 'foo', permission: 'active'}],
                         data:
-                            '000000000000285d000000000000ae39e80300000000000003454f53000000000b68656c6c6f207468657265',
+                        '000000000000285d000000000000ae39e80300000000000003454f53000000000b68656c6c6f207468657265',
                     },
                     {
                         account: 'eosio.token',
                         name: 'transfer',
                         authorization: [{actor: 'baz', permission: 'active'}],
                         data:
-                            '000000000000be39000000000000ae39e80300000000000003454f53000000000b68656c6c6f207468657265',
+                        '000000000000be39000000000000ae39e80300000000000003454f53000000000b68656c6c6f207468657265',
                     },
                 ],
             ],
@@ -126,7 +126,7 @@ describe('signing request', function () {
                             name: 'transfer',
                             authorization: [{actor: 'foo', permission: 'active'}],
                             data:
-                                '000000000000285D000000000000AE39E80300000000000003454F53000000000B68656C6C6F207468657265',
+                            '000000000000285D000000000000AE39E80300000000000003454F53000000000B68656C6C6F207468657265',
                         },
                     ],
                 },
@@ -144,7 +144,7 @@ describe('signing request', function () {
                             name: 'transfer',
                             authorization: [{actor: 'foo', permission: 'active'}],
                             data:
-                                '000000000000285d000000000000ae39e80300000000000003454f53000000000b68656c6c6f207468657265',
+                            '000000000000285d000000000000ae39e80300000000000003454f53000000000b68656c6c6f207468657265',
                         },
                     ],
                     context_free_actions: [],
@@ -223,7 +223,7 @@ describe('signing request', function () {
                     name: 'transfer',
                     authorization: [{actor: '............1', permission: '............1'}],
                     data:
-                        '0100000000000000000000000000285d01000000000000000050454e47000000135468616e6b7320666f72207468652066697368',
+                    '0100000000000000000000000000285d01000000000000000050454e47000000135468616e6b7320666f72207468652066697368',
                 },
             ],
             callback: '',
@@ -406,7 +406,7 @@ describe('signing request', function () {
         const mockSig = {
             signer: 'foo',
             signature:
-                'SIG_K1_K8Wm5AXSQdKYVyYFPCYbMZurcJQXZaSgXoqXAKE6uxR6Jot7otVzS55JGRhixCwNGxaGezrVckDgh88xTsiu4wzzZuP9JE',
+            'SIG_K1_K8Wm5AXSQdKYVyYFPCYbMZurcJQXZaSgXoqXAKE6uxR6Jot7otVzS55JGRhixCwNGxaGezrVckDgh88xTsiu4wzzZuP9JE',
         }
         const signatureProvider: SignatureProvider = {
             sign(message) {
@@ -437,9 +437,9 @@ describe('signing request', function () {
 
     it('should encode and decode test requests', async function () {
         const req1uri =
-            'esr://gmNgZGBY1mTC_MoglIGBIVzX5uxZRqAQGMBoExgDAjRi4fwAVz93ICUckpGYl12skJZfpFCSkaqQllmcwczAAAA'
+        'esr://gmNgZGBY1mTC_MoglIGBIVzX5uxZRqAQGMBoExgDAjRi4fwAVz93ICUckpGYl12skJZfpFCSkaqQllmcwczAAAA'
         const req2uri =
-            'esr://gmNgZGBY1mTC_MoglIGBIVzX5uxZRqAQGMBoExgDAjRi4fwAVz93ICUckpGYl12skJZfpFCSkaqQllmcwQxREVOsEcsgX-9-jqsy1EhNQM_GM_FkQMIziUU1VU4PsmOn_3r5hUMumeN3PXvdSuWMm1o9u6-FmCwtPvR0haqt12fNKtlWzTuiNwA'
+        'esr://gmNgZGBY1mTC_MoglIGBIVzX5uxZRqAQGMBoExgDAjRi4fwAVz93ICUckpGYl12skJZfpFCSkaqQllmcwQxREVOsEcsgX-9-jqsy1EhNQM_GM_FkQMIziUU1VU4PsmOn_3r5hUMumeN3PXvdSuWMm1o9u6-FmCwtPvR0haqt12fNKtlWzTuiNwA'
         const req1 = SigningRequest.from(req1uri, options)
         const req2 = SigningRequest.from(req2uri, options)
         assert.deepStrictEqual(
@@ -450,7 +450,7 @@ describe('signing request', function () {
         assert.deepStrictEqual(recode(req2.signature), {
             signer: 'foobar',
             signature:
-                'SIG_K1_KBub1qmdiPpWA2XKKEZEG3EfKJBf38GETHzbd4t3CBdWLgdvFRLCqbcUsBbbYga6jmxfdSFfodMdhMYraKLhEzjSCsiuMs',
+            'SIG_K1_KBub1qmdiPpWA2XKKEZEG3EfKJBf38GETHzbd4t3CBdWLgdvFRLCqbcUsBbbYga6jmxfdSFfodMdhMYraKLhEzjSCsiuMs',
         })
         assert.strictEqual(req1.encode(), req1uri)
         assert.strictEqual(req2.encode(), req2uri)
@@ -514,7 +514,7 @@ describe('signing request', function () {
 
     it('should template callback url', async function () {
         const mockSig =
-            'SIG_K1_K8Wm5AXSQdKYVyYFPCYbMZurcJQXZaSgXoqXAKE6uxR6Jot7otVzS55JGRhixCwNGxaGezrVckDgh88xTsiu4wzzZuP9JE'
+        'SIG_K1_K8Wm5AXSQdKYVyYFPCYbMZurcJQXZaSgXoqXAKE6uxR6Jot7otVzS55JGRhixCwNGxaGezrVckDgh88xTsiu4wzzZuP9JE'
         const mockTx = '308d206c51c5dd6c02e0417e44560cdc2e76db7765cea19dfa8f9f94922f928a'
         const request = await SigningRequest.create(
             {
@@ -568,7 +568,7 @@ describe('signing request', function () {
 
     it('should resolve templated callback urls', async function () {
         const req1uri =
-            'esr://gmNgZGBY1mTC_MoglIGBIVzX5uxZRqAQGDBBaUWYAARoxMIkGAJDIyAM9YySkoJiK3391IrE3IKcVL3k_Fz7kgrb6uqSitpataQ8ICspr7aWAQA'
+        'esr://gmNgZGBY1mTC_MoglIGBIVzX5uxZRqAQGDBBaUWYAARoxMIkGAJDIyAM9YySkoJiK3391IrE3IKcVL3k_Fz7kgrb6uqSitpataQ8ICspr7aWAQA'
         const req1 = SigningRequest.from(req1uri, options)
         const abis = await req1.fetchAbis()
         const resolved = await req1.resolve(
@@ -588,7 +588,7 @@ describe('signing request', function () {
             1234
         )
         const expected =
-            'https://example.com?tx=6aff5c203810ff6b40469fe20318856354889ff037f4cf5b89a157514a43e825&bn=1234'
+        'https://example.com?tx=6aff5c203810ff6b40469fe20318856354889ff037f4cf5b89a157514a43e825&bn=1234'
         assert.equal(callback!.url, expected)
     })
 
@@ -655,13 +655,13 @@ describe('signing request', function () {
             background: false,
             payload: {
                 sig:
-                    'SIG_K1_K4nkCupUx3hDXSHq4rhGPpDMPPPjJyvmF3M6j7ppYUzkR3L93endwnxf3YhJSG4SSvxxU1ytD8hj39kukTeYxjwy5H3XNJ',
+                'SIG_K1_K4nkCupUx3hDXSHq4rhGPpDMPPPjJyvmF3M6j7ppYUzkR3L93endwnxf3YhJSG4SSvxxU1ytD8hj39kukTeYxjwy5H3XNJ',
                 tx: 'b8e921a7b68d7309847e633d74963f25eb5a7d0b15b1aceb143723c234686a8d',
                 rbn: '0',
                 rid: '0',
                 ex: '2020-07-10T08:40:20',
                 req:
-                    'esr://AwAAAwAAAAAAAChdAAAVbXlhcHA6Ly9sb2dpbj17e2NpZH19AQljaGFpbl9pZHMFAgABAAo',
+                'esr://AwAAAwAAAAAAAChdAAAVbXlhcHA6Ly9sb2dpbj17e2NpZH19AQljaGFpbl9pZHMFAgABAAo',
                 sa: 'foo',
                 sp: 'active',
                 cid: '1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4',
