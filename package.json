@@ -15,7 +15,7 @@
         "prepare": "make"
     },
     "dependencies": {
-        "@greymass/eosio": "^0.1.0"
+        "@greymass/eosio": "^0.1.2"
     },
     "devDependencies": {
         "@cush/rollup-plugin-esbuild": "2.5.2-canary.138",
