@@ -1,18 +1,65 @@
+import fs from 'fs'
 import dts from 'rollup-plugin-dts'
-import esbuild from '@cush/rollup-plugin-esbuild' // https://github.com/egoist/rollup-plugin-esbuild/pull/138
+import ts from '@wessberg/rollup-plugin-ts'
 
-const name = require('./package.json').main.replace(/\.js$/, '')
-const ext = (format) => (format == 'dts' ? 'd.ts' : format == 'cjs' ? 'js' : 'mjs')
-const bundle = (format) => ({
-    input: 'src/index.ts',
-    output: {
-        file: `${name}.${ext(format)}`,
-        format: format == 'cjs' ? 'cjs' : 'es',
-        sourcemap: format != 'dts',
+import pkg from './package.json'
+
+const license = fs.readFileSync('LICENSE').toString('utf-8').trim()
+const banner = `
+/**
+ * EOSIO Signing Request v${pkg.version}
+ * ${pkg.homepage}
+ *
+ * @license
+ * ${license.replace(/\n/g, '\n * ')}
+ */
+`.trim()
+
+const external = Object.keys(pkg.dependencies)
+
+export default [
+    {
+        input: 'src/index.ts',
+        output: {banner, file: pkg.main, format: 'cjs', sourcemap: true},
+        plugins: [
+            ts({
+                tsconfig: (conf) => ({
+                    ...conf,
+                    declaration: false,
+                    target: 'es6',
+                    module: 'commonjs',
+                }),
+            }),
+        ],
+        external,
+        onwarn,
     },
+    {
+        input: 'src/index.ts',
+        output: {banner, file: pkg.module, format: 'esm', sourcemap: true},
+        plugins: [
+            ts({
+                tsconfig: (conf) => ({
+                    ...conf,
+                    declaration: false,
+                    target: 'esnext',
+                    module: 'esnext',
+                }),
+            }),
+        ],
+        external,
+        onwarn,
+    },
+    {
+        input: 'src/index.ts',
+        output: {banner, file: pkg.types, format: 'esm'},
+        onwarn,
+        plugins: [dts()],
+    },
+]
 
-    plugins: format == 'dts' ? [dts()] : [esbuild()],
-    external: (id) => !/^[./]/.test(id),
-})
-
-export default [bundle('es'), bundle('cjs'), bundle('dts')]
+function onwarn(warning, rollupWarn) {
+    if (warning.code !== 'CIRCULAR_DEPENDENCY') {
+        rollupWarn(warning)
+    }
+}
