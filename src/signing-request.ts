@@ -46,6 +46,7 @@ import {
     RequestFlags,
     RequestSignature,
 } from './abi'
+import {IdentityProof} from './identity-proof'
 
 /** Current supported protocol version, backwards compatible with version 2. */
 export const ProtocolVersion = 3
@@ -95,6 +96,8 @@ export interface CallbackPayload {
     req: string
     /** Expiration time used when resolving request. */
     ex: string
+    /** The resolved chain id.  */
+    cid?: string
     /** All signatures 0-indexed as `sig0`, `sig1`, etc. */
     [sig0: string]: string | undefined
 }
@@ -1218,6 +1221,19 @@ export class ResolvedSigningRequest {
             payload,
             url,
         }
+    }
+
+    public getIdentityProof(signature: SignatureType) {
+        if (!this.request.isIdentity()) {
+            throw new Error('Not a identity request')
+        }
+        return IdentityProof.from({
+            chainId: this.chainId,
+            scope: this.request.getIdentityScope()!,
+            expiration: this.transaction.expiration,
+            signer: this.signer,
+            signature,
+        })
     }
 }
 

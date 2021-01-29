@@ -13,6 +13,7 @@ import {
 } from '../src'
 import * as TSModule from '../src'
 import {Name, PrivateKey, Serializer, Signature, UInt64} from '@greymass/eosio'
+import {IdentityProof} from '../src/identity-proof'
 
 let {SigningRequest, PlaceholderAuth, PlaceholderName} = TSModule
 if (process.env['TEST_UMD']) {
@@ -637,6 +638,26 @@ describe('signing request', function () {
         assert.equal(
             recreated.chainId.hexString,
             '1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4'
+        )
+        const proof = recreated.getIdentityProof(sig)
+        assert.equal(
+            String(proof),
+            'EOSIO EGRIezzRqJfOA65baoZWUXR+LhUgkPmcHRnUTgGupaQAAAAAAAAoXXQpCF8AAAAAAAAoXQAAAACo7TIyAB9I36p6NdMCKzksNwp4nFbiEhq8/sVAeji/4JMzk/CHAwc5ipaF8G/SNuXkJ9XWaDSu98DWzbXuvaVcimXUvGDQ'
+        )
+        const recreatedProof = IdentityProof.from(String(proof))
+        assert.ok(
+            recreatedProof.verify(
+                {threshold: 4, keys: [{weight: 4, key: key.toPublic()}]},
+                '2020-07-10T08:00:00'
+            ),
+            'verifies valid proof'
+        )
+        assert.ok(
+            !recreatedProof.verify(
+                {threshold: 4, keys: [{weight: 4, key: key.toPublic()}]},
+                '2020-07-10T09:00:00'
+            ),
+            'does not verify expired proof'
         )
     })
 })
