@@ -613,7 +613,7 @@ export class SigningRequest {
     public getSignatureDigest() {
         // protocol version + utf8 "request"
         const prefix = [this.version, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74]
-        return new Bytes().appending(prefix).appending(this.getData()).sha256Digest
+        return Checksum256.hash(Bytes.from(prefix).appending(this.getData()))
     }
 
     /**
@@ -1227,7 +1227,7 @@ function encodeAction(action: AnyAction, abis: Record<string, ABIDef>): Action {
     }
     const abi = abis[String(Name.from(action.account))]
     if (!abi) {
-        throw new Error(`Missing abi for ${action.account}`)
+        throw new Error(`Missing ABI for ${action.account}`)
     }
     return Action.from(action, abi)
 }

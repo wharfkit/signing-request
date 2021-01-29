@@ -21,9 +21,9 @@ export type ChainIdType = ChainId | ChainName | Checksum256Type
 
 @TypeAlias('chain_id')
 export class ChainId extends Checksum256 {
-    static from<T extends typeof Checksum256>(this: T, value: ChainIdType): InstanceType<T> {
+    static from(value: ChainIdType): ChainId {
         if (value instanceof this) {
-            return value as InstanceType<T>
+            return value
         }
         if (typeof value === 'number') {
             value = ChainIdLookup.get(value) as Checksum256Type
@@ -31,7 +31,7 @@ export class ChainId extends Checksum256 {
                 throw new Error('Unknown chain id alias')
             }
         }
-        return super.from(value) as InstanceType<T>
+        return super.from(value) as ChainId
     }
 
     get chainVariant(): ChainIdVariant {
