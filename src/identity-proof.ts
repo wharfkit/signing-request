@@ -80,24 +80,29 @@ export class IdentityProof extends Struct {
     }
 
     /**
-     * Recover the public key that signed this proof.
+     * Transaction this proof resolves to.
+     * @internal
      */
-    recover(): PublicKey {
+    get transaction(): Transaction {
         const action = Action.from({
             account: '',
             name: 'identity',
             authorization: [this.signer],
             data: IdentityV3.from({scope: this.scope, permission: this.signer}),
         })
-
-        const transaction = Transaction.from({
+        return Transaction.from({
             ref_block_num: 0,
             ref_block_prefix: 0,
             expiration: this.expiration,
             actions: [action],
         })
+    }
 
-        return this.signature.recoverDigest(transaction.signingDigest(this.chainId))
+    /**
+     * Recover the public key that signed this proof.
+     */
+    recover(): PublicKey {
+        return this.signature.recoverDigest(this.transaction.signingDigest(this.chainId))
     }
 
     /**
