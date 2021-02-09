@@ -2,12 +2,12 @@
 EEP: 7
 title: ESR (EOSIO Signing Request)
 author: Aaron Cox (@aaroncox), Johan Nordberg (@jnordberg)
-revision: 2
+revision: 3
 status: Draft
 type: Standards Track
 category: Interface
 created: 2019-05-19
-updated: 2020-05-09
+updated: 2021-02-05
 ---
 
 **Table of Contents**
@@ -148,22 +148,22 @@ header  request                 signature
 
 ### Header
 
-The header is the 8 initial bits of the data, with the first 7 bits representing the protocol version and the last bit denoting if the data is compressed. The protocol version this document describes is `2`, making the only valid headers:
+The header is the 8 initial bits of the data, with the first 7 bits representing the protocol version and the last bit denoting if the data is compressed. Examples:
 
-- `0x02` a uncompressed payload
-- `0x82` a compressed payload
+- `0x03` request version 3 with a uncompressed payload
+- `0x82` request version 2 a compressed payload
 
 ### Payload
 
 Data beyond the 1-byte header forms the representation of the request payload. This structure is as follows (in byte order):
 
-  param            | description
- ------------------|-------------
+  param                         | description
+ -------------------------------|-------------
   [`chain_id`](#chain_id)       | Target chain id
-  [`req`](#req)            | The action/tx/identity being requested
-  [`flags`](#flags)          | Various flags for how to process this transaction
+  [`req`](#req)                 | The action/tx/identity being requested
+  [`flags`](#flags)             | Various flags for how to process this transaction
   [`callback`](#callback)       | URL that should be triggered to after the transaction is signed
-  [`info`](#info)           | Additional metadata to pass along with the request
+  [`info`](#info)               | Additional metadata to pass along with the request
 
 A representation of this schema can be found in the Appendix as both an [EOSIO C++ struct](#signing-request-represented-as-a-eosio-c-struct) and an [EOSIO ABI Definition](#signing-request-represented-as-an-eosio-abi).
 
@@ -175,7 +175,7 @@ This can be either a full 32-byte chain id:
 
 ```jsonc
 {
-    "chain_id": "aca376f206b8fc25a6ed44dbdc66547c36c6c33e3a119ffbeaef943642f0e906"
+    "chain_id": [ "chain_id", "aca376f206b8fc25a6ed44dbdc66547c36c6c33e3a119ffbeaef943642f0e906" ]
 }
 ```
 
@@ -185,6 +185,14 @@ Or a 1-byte [chain alias](#chain-aliases) can be used (`1` being defined EOS):
 ```jsonc
 {
     "chain_id": [ "chain_alias", 1 ]
+}
+```
+
+As of version 3 a request can also specify the chain alias `0` to denote that the request is valid for any chain, see [multi chain requests](#multi-chain-requests).
+
+```jsonc
+{
+    "chain_id": [ "chain_alias", 0 ]
 }
 ```
 
@@ -469,6 +477,7 @@ Available Parameters:
   - `req`: The originating signing request packed as a uri string.
   - `sig`: The first signature.
   - `sigX`: All signatures are 0-indexed as `sig0`, `sig1`, etc.
+  - `cid`: Chain id used when resolving the request.
 
 When the callback is performed in the background all the parameters are included as a JSON object.
 
@@ -755,7 +764,7 @@ console.log(encoded);
 gmNcs7jsE9uOP6rL3rrcvpMWUmN27LCdleD836_eTzFz-vCSjZGRYcm-EsZXBqEMILDA6C5QBAKYoLQQTAAIFNycd-1iZGAUyigpKSi20tdPyc9NzMzTS87PZQAA
 
 */
-````
+```
 
 #### Example - Encoded PATH to Transaction
 
@@ -970,6 +979,7 @@ To resolve a identity request to the identity proof action the optional account 
         }
     ],
     "data": {
+        "scope": "mydapp",
         "permission": {
             "actor": "foobarfoobar",
             "permission": "active"
@@ -1005,12 +1015,26 @@ The signature is just a standard EOSIO transaction signature (chainId + serializ
 
 ```
 sign(sha256(
-  __ 32 byte chain id_____________________________________________
-  00000000000000000000000000000100000000000000000000003ebb3c557201
-  __ 16 byte account permission x2 _______________________________
-  ___ 33 byte zero-padding _________________________________________
+  <32-byte chain id>
+  <4-byte expiration utc seconds>
+  000000000000000000000100000000000000000000003ebb3c557201 // tx header
+  <8-byte signer name>
+  <8-byte signer permission>
+  19 // action data len
+  <8-byte scope>
+  01 // permission present
+  <8-byte signer name again>
+  <8-byte signer permission again>
+  00 // tx extensions
+  0000000000000000000000000000000000000000000000000000000000000000 // zero padding
 ))
 ```
+
+##### Multi-chain requests
+
+When the chain id variant is set to the `0` (UNKNOWN) alias the signer may choose what chain id to use when resolving the request. Optionally the request can embed a `chain_ids` info key of the type `vector<variant<chain_id, chain_alias>>` to inform the signer which chains are available.
+
+The signer must provide selected chain id as the `cid` parameter in the response payload for multi-chain requests.
 
 ##### MIME Type
 
@@ -1095,9 +1119,14 @@ struct callback {
     bool background;
 };
 
+struct identity {
+    name scope;
+    optional<permission_level> permission;
+}
+
 struct signing_request {
     variant<chain_alias, chain_id> chain_id;
-    variant<action, vector<action>, transaction> req;
+    variant<action, vector<action>, transaction, identity> req;
     bool broadcast;
     optional<callback> callback;
 }
@@ -1105,7 +1134,7 @@ struct signing_request {
 
 ###### Signing Request represented as an EOSIO ABI:
 
-```json
+```js
 {
     version: 'eosio::abi/1.1',
     types: [
@@ -1271,6 +1300,10 @@ struct signing_request {
             name: 'identity',
             fields: [
                 {
+                    name: 'scope',
+                    type: 'name',
+                },
+                {
                     name: 'permission',
                     type: 'permission_level?',
                 },
@@ -1319,9 +1352,10 @@ struct signing_request {
 
 ## Change Log
 
-- 2020/05/20: Updated to Revision 2.
+- 2020/05/20: Updated to Revision 2
 - 2019/10/28: Added change log, MIME type recommendation
 - 2020/05/29: Add details on request resolution and & signatures
+- 2021/02/05: Revision 3, updated identity request data & multi-chain requests
 
 ---
 
