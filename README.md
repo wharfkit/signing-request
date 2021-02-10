@@ -1,10 +1,10 @@
-# eosio-signing-request (ESR - Revision 2)
+# eosio-signing-request (ESR - Revision 3)
 ![version](https://badgen.net/npm/v/eosio-signing-request?style=for-the-badge)
 ![license](https://badgen.net/npm/license/eosio-signing-request?style=for-the-badge)
 ![downloads](https://badgen.net/npm/dw/eosio-signing-request?style=for-the-badge)
 
 A library to assist with the EOSIO Signing Request (ESR) protocol.
-The full specification for ESR is available here:
+The full specification for ESR (Revision 3) is available here:
 
 https://github.com/eosio-eps/EEPs/blob/master/EEPS/eep-7.md
 
