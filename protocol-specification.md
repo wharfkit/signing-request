@@ -1352,10 +1352,10 @@ struct signing_request {
 
 ## Change Log
 
+- 2021/02/05: Revision 3, updated identity request data & multi-chain requests
+- 2020/05/29: Add details on request resolution and & signatures
 - 2020/05/20: Updated to Revision 2
 - 2019/10/28: Added change log, MIME type recommendation
-- 2020/05/29: Add details on request resolution and & signatures
-- 2021/02/05: Revision 3, updated identity request data & multi-chain requests
 
 ---
 
