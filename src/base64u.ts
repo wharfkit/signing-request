@@ -3,17 +3,20 @@
  * Based on https://gist.github.com/jonleighton/958841
  */
 
-const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+const baseCharset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
 const lookup = new Uint8Array(256)
-for (let i = 0; i < 64; i++) {
-    lookup[charset.charCodeAt(i)] = i
+for (let i = 0; i < 62; i++) {
+    lookup[baseCharset.charCodeAt(i)] = i
 }
+// support both urlsafe and standard base64
+lookup[43] = lookup[45] = 62
+lookup[47] = lookup[95] = 63
 
-export function encode(data: Uint8Array): string {
+export function encode(data: Uint8Array, urlSafe = true): string {
     const byteLength = data.byteLength
     const byteRemainder = byteLength % 3
     const mainLength = byteLength - byteRemainder
-
+    const charset = baseCharset + (urlSafe ? '-_' : '+/')
     const parts: string[] = []
 
     let a: number
@@ -70,7 +73,7 @@ export function decode(input: string): Uint8Array {
     let b: number
     let c: number
     let d: number
-    let p: number = 0
+    let p = 0
 
     for (let i = 0; i < input.length; i += 4) {
         a = lookup[input.charCodeAt(i)]

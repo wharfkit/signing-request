@@ -1,3 +1,4 @@
 export * from './signing-request'
-import * as abi from './abi'
-export {abi}
+export * from './abi'
+export * from './chain-id'
+export * from './identity-proof'

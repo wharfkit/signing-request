@@ -1,15 +1,17 @@
 {
-  "compilerOptions": {
-    "declaration": true,
-    "lib": ["esnext", "dom"],
-    "module": "esnext",
-    "moduleResolution": "node",
-    "outDir": "lib",
-    "downlevelIteration": true,
-    "target": "esnext",
-    "strict": true,
-  },
-  "include": [
-    "src/**/*.ts"
-  ]
+    "compilerOptions": {
+        "downlevelIteration": true,
+        "esModuleInterop": true,
+        "experimentalDecorators": true,
+        "importHelpers": true,
+        "isolatedModules": true,
+        "lib": ["dom", "esnext"],
+        "module": "esnext",
+        "moduleResolution": "node",
+        "noImplicitAny": false,
+        "sourceMap": true,
+        "strict": true,
+        "target": "esnext"
+    },
+    "include": ["src/**/*"]
 }
