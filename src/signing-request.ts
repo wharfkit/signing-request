@@ -1146,7 +1146,7 @@ export class ResolvedSigningRequest {
                 ref_block_num: payload.rbn,
                 ref_block_prefix: payload.rid,
                 expiration: payload.ex,
-                chainId: payload.cid,
+                chainId: payload.cid || request.getChainId(),
             }
         )
     }
