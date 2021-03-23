@@ -918,7 +918,7 @@ export class SigningRequest {
     public isMultiChain(): boolean {
         return (
             this.data.chain_id.variantIdx === 0 &&
-            (this.data.chain_id.value as ChainAlias).value === ChainName.UNKNOWN
+            (this.data.chain_id.value as ChainAlias).equals(ChainName.UNKNOWN)
         )
     }
 
@@ -1255,15 +1255,11 @@ function isIdentity(action: AnyAction) {
 }
 
 function hasTapos(tx: Transaction) {
-    return !(
-        tx.expiration.value.value === 0 &&
-        tx.ref_block_num.value === 0 &&
-        tx.ref_block_prefix.value === 0
-    )
+    return !(tx.expiration.equals(0) && tx.ref_block_num.equals(0) && tx.ref_block_prefix.equals(0))
 }
 
 function expirationTime(timestamp?: TimePointType, expireSeconds: UInt32Type = 60) {
     const ts = TimePointSec.from(timestamp || new Date())
     const exp = UInt32.from(expireSeconds)
-    return TimePointSec.fromMilliseconds(ts.toMilliseconds() + exp.value * 1000)
+    return TimePointSec.fromInteger(ts.value.adding(exp))
 }

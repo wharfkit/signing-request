@@ -48,14 +48,14 @@ export class RequestFlags extends UInt8 {
     static background = 1 << 1
 
     get broadcast() {
-        return (this.value & RequestFlags.broadcast) !== 0
+        return (Number(this) & RequestFlags.broadcast) !== 0
     }
     set broadcast(enabled: boolean) {
         this.setFlag(RequestFlags.broadcast, enabled)
     }
 
     get background() {
-        return (this.value & RequestFlags.background) !== 0
+        return (Number(this) & RequestFlags.background) !== 0
     }
     set background(enabled: boolean) {
         this.setFlag(RequestFlags.background, enabled)
@@ -63,9 +63,10 @@ export class RequestFlags extends UInt8 {
 
     private setFlag(flag: number, enabled: boolean) {
         if (enabled) {
-            this.value |= flag
+            // TODO: implement bitwise operators in core, bn.js setbit does not work
+            this.value = UInt8.from(Number(this) | flag).value
         } else {
-            this.value &= ~flag
+            this.value.imaskn(flag)
         }
     }
 }

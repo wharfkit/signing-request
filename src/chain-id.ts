@@ -1,4 +1,11 @@
-import {Checksum256, Checksum256Type, TypeAlias, UInt8, Variant} from '@greymass/eosio'
+import {
+    Checksum256,
+    Checksum256Type,
+    isInstanceOf,
+    TypeAlias,
+    UInt8,
+    Variant,
+} from '@greymass/eosio'
 
 /** Chain ID aliases. */
 export enum ChainName {
@@ -22,7 +29,7 @@ export type ChainIdType = ChainId | ChainName | Checksum256Type
 @TypeAlias('chain_id')
 export class ChainId extends Checksum256 {
     static from(value: ChainIdType): ChainId {
-        if (value instanceof this) {
+        if (isInstanceOf(value, this)) {
             return value
         }
         if (typeof value === 'number') {
@@ -54,19 +61,17 @@ export class ChainId extends Checksum256 {
 }
 
 @TypeAlias('chain_alias')
-export class ChainAlias extends UInt8 {
-    value!: ChainName
-}
+export class ChainAlias extends UInt8 {}
 
 @Variant.type('variant_id', [ChainAlias, ChainId])
 export class ChainIdVariant extends Variant {
     value!: ChainId | ChainAlias
 
     get chainId(): ChainId {
-        if (this.value instanceof ChainId) {
+        if (isInstanceOf(this.value, ChainId)) {
             return this.value
         }
-        return ChainId.from(this.value.value)
+        return ChainId.from(Number(this.value.value))
     }
 }
 

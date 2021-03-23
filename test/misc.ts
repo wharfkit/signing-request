@@ -1,9 +1,9 @@
 import {strict as assert} from 'assert'
 import 'mocha'
-import {ChainId, ChainIdVariant, ChainName} from '../src'
+import {ChainId, ChainIdVariant, ChainName, RequestFlags} from '../src'
 
 describe('misc', function () {
-    it('should create chain id', async function () {
+    it('should create chain id', function () {
         const id = ChainId.from(1)
         assert.equal(
             id.equals('aca376f206b8fc25a6ed44dbdc66547c36c6c33e3a119ffbeaef943642f0e906'),
@@ -20,5 +20,18 @@ describe('misc', function () {
         assert.throws(() => {
             ChainIdVariant.from(['chain_alias', 0]).chainId
         })
+    })
+    it('should set request flags', function () {
+        const flags = RequestFlags.from(0)
+        assert.equal(flags.background, false)
+        assert.equal(flags.broadcast, false)
+        flags.background = true
+        assert.equal(flags.background, true)
+        assert.equal(flags.broadcast, false)
+        assert.equal(Number(flags), 2)
+        flags.broadcast = true
+        assert.equal(flags.background, true)
+        assert.equal(flags.broadcast, true)
+        assert.equal(Number(flags), 3)
     })
 })
