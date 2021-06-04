@@ -9,6 +9,7 @@
         "module": "esnext",
         "moduleResolution": "node",
         "noImplicitAny": false,
+        "useDefineForClassFields": false,
         "sourceMap": true,
         "strict": true,
         "target": "es2020"
