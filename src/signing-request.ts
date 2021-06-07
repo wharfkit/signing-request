@@ -145,6 +145,8 @@ export interface TransactionContext {
     chainId?: ChainIdType
 }
 
+const DEFAULT_SCHEME = 'esr'
+
 /**
  * The placeholder name: `............1` aka `uint64(1)`.
  * If used in action data will be resolved to current signer.
@@ -285,6 +287,8 @@ export interface SigningRequestEncodingOptions {
     abiProvider?: AbiProvider
     /** Optional signature provider, will be used to create a request signature if provided. */
     signatureProvider?: SignatureProvider
+    /** Custom Scheme . */
+    scheme?: string
 }
 
 export type AbiMap = Map<string, ABI>
@@ -467,7 +471,9 @@ export class SigningRequest {
             version,
             this.storageType(version).from(data),
             options.zlib,
-            options.abiProvider
+            options.abiProvider,
+            undefined,
+            options.scheme
         )
 
         // sign the request if given a signature provider
@@ -538,7 +544,10 @@ export class SigningRequest {
             throw new Error('Invalid request uri')
         }
         const [scheme, path] = uri.split(':')
-        if (scheme !== 'esr' && scheme !== 'web+esr') {
+        if (
+            scheme !== (options.scheme || DEFAULT_SCHEME) &&
+            scheme !== `web+${options.scheme || DEFAULT_SCHEME}`
+        ) {
             throw new Error('Invalid scheme')
         }
         const data = base64u.decode(path.startsWith('//') ? path.slice(2) : path)
@@ -565,7 +574,14 @@ export class SigningRequest {
         if (decoder.canRead()) {
             sig = Serializer.decode({data: decoder, type: RequestSignature}) as RequestSignature
         }
-        return new SigningRequest(version, req, options.zlib, options.abiProvider, sig)
+        return new SigningRequest(
+            version,
+            req,
+            options.zlib,
+            options.abiProvider,
+            sig,
+            options.scheme
+        )
     }
 
     /** The signing request version. */
@@ -576,6 +592,7 @@ export class SigningRequest {
 
     /** The request signature. */
     public signature?: RequestSignature
+    public scheme: string = DEFAULT_SCHEME
 
     private zlib?: ZlibProvider
     private abiProvider?: AbiProvider
@@ -589,16 +606,19 @@ export class SigningRequest {
         data: RequestDataV2 | RequestDataV3,
         zlib?: ZlibProvider,
         abiProvider?: AbiProvider,
-        signature?: RequestSignature
+        signature?: RequestSignature,
+        scheme?: string
     ) {
         if (data.flags.broadcast && data.req.variantName === 'identity') {
             throw new Error('Invalid request (identity request cannot be broadcast)')
         }
+
         this.version = version
         this.data = data
         this.zlib = zlib
         this.abiProvider = abiProvider
         this.signature = signature
+        this.scheme = scheme || this.scheme
     }
 
     /**
@@ -676,7 +696,7 @@ export class SigningRequest {
         const out = new Uint8Array(1 + array.byteLength)
         out[0] = header
         out.set(array, 1)
-        let scheme = 'esr:'
+        let scheme = `${this.scheme}:`
         if (slashes !== false) {
             scheme += '//'
         }
@@ -878,6 +898,14 @@ export class SigningRequest {
             tx,
             chainId
         )
+    }
+
+    /**
+     * Get Scheme
+     * @returns scheme like 'esr'
+     */
+     public getScheme(): string {
+        return this.scheme
     }
 
     /**
