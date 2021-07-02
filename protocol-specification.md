@@ -478,6 +478,7 @@ Available Parameters:
   - `sig`: The first signature.
   - `sigX`: All signatures are 0-indexed as `sig0`, `sig1`, etc.
   - `cid`: Chain id used when resolving the request.
+  - `tx`: Transaction id used when resolving request.
 
 When the callback is performed in the background all the parameters are included as a JSON object.
 
