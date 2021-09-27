@@ -33,5 +33,13 @@ describe('misc', function () {
         assert.equal(flags.background, true)
         assert.equal(flags.broadcast, true)
         assert.equal(Number(flags), 3)
+        flags.background = false
+        assert.equal(flags.background, false)
+        assert.equal(flags.broadcast, true)
+        assert.equal(Number(flags), 1)
+        flags.broadcast = false
+        assert.equal(flags.background, false)
+        assert.equal(flags.broadcast, false)
+        assert.equal(Number(flags), 0)
     })
 })
