@@ -66,7 +66,7 @@ export class RequestFlags extends UInt8 {
             // TODO: implement bitwise operators in core, bn.js setbit does not work
             this.value = UInt8.from(Number(this) | flag).value
         } else {
-            this.value.imaskn(flag)
+            this.value = UInt8.from(Number(this) & ~flag).value
         }
     }
 }
