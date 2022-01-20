@@ -1,6 +1,6 @@
 {
     "name": "eosio-signing-request",
-    "version": "2.3.1",
+    "version": "2.4.0",
     "description": "EOSIO Signing Request (ESR / EEP-7) encoder and decoder",
     "homepage": "https://github.com/greymass/eosio-signing-request",
     "license": "MIT",
