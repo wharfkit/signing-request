@@ -1184,6 +1184,10 @@ export class ResolvedSigningRequest {
         return this.transaction.signingDigest(this.chainId)
     }
 
+    public get signingData(): Bytes {
+        return this.transaction.signingData(this.chainId)
+    }
+
     public getCallback(
         signatures: SignatureType[],
         blockNum?: UInt32Type
