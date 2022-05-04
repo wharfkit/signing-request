@@ -837,7 +837,7 @@ export class SigningRequest {
         }
         const actions = this.resolveActions(abis, signer)
         // TODO: resolve context free actions
-        const context_free_actions = (tx.context_free_actions as unknown) as ResolvedAction[]
+        const context_free_actions = tx.context_free_actions as unknown as ResolvedAction[]
         return {...tx, context_free_actions, actions} as ResolvedTransaction
     }
 
