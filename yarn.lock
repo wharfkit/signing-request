@@ -212,10 +212,10 @@
     minimatch "^3.0.4"
     strip-json-comments "^3.1.1"
 
-"@greymass/eosio@^0.5.0":
-  version "0.5.5"
-  resolved "https://registry.yarnpkg.com/@greymass/eosio/-/eosio-0.5.5.tgz#ce049bb85bcc0dbbc37181579dec3536900ca7c5"
-  integrity sha512-3SpIjECqdubf3ovrd+K6jvX9AG/wqW2zmFlb6gRlVCLxPSw09Vy/nNBLxLN1E4c2558T8LIYa3/kxteBluC3Zg==
+"@greymass/eosio@^0.6.0":
+  version "0.6.0"
+  resolved "https://registry.yarnpkg.com/@greymass/eosio/-/eosio-0.6.0.tgz#6da636c1651626881cee0a46747559d20412f3a0"
+  integrity sha512-acVKfiuNMkZ9aOFf/EJIk8X5PAoc53ZJeGP0ehpACX3Pz/rFOTmZFDnVaBKTuL3pFSMPA1K5h1la9nC42fDTcw==
   dependencies:
     bn.js "^4.11.9"
     brorand "^1.1.0"
