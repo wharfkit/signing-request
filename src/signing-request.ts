@@ -814,7 +814,7 @@ export class SigningRequest {
                 ctx.ref_block_prefix !== undefined
             ) {
                 tx.expiration = TimePointSec.from(ctx.expiration)
-                tx.ref_block_num = UInt16.from(ctx.ref_block_num)
+                tx.ref_block_num = UInt16.from(ctx.ref_block_num, 'truncate')
                 tx.ref_block_prefix = UInt32.from(ctx.ref_block_prefix)
             } else if (
                 ctx.block_num !== undefined &&
@@ -822,7 +822,7 @@ export class SigningRequest {
                 ctx.timestamp !== undefined
             ) {
                 tx.expiration = expirationTime(ctx.timestamp, ctx.expire_seconds)
-                tx.ref_block_num = UInt16.from(ctx.block_num)
+                tx.ref_block_num = UInt16.from(ctx.block_num, 'truncate')
                 tx.ref_block_prefix = UInt32.from(ctx.ref_block_prefix)
             } else {
                 throw new Error(
