@@ -224,6 +224,49 @@ describe('signing request', function () {
         })
     })
 
+    it('should resolve to transaction with a higher height', async function () {
+        const request = await SigningRequest.create(
+            {
+                action: {
+                    account: 'eosio.token',
+                    name: 'transfer',
+                    authorization: [{actor: 'foo', permission: 'active'}],
+                    data: {from: 'foo', to: 'bar', quantity: '1.000 EOS', memo: 'hello there'},
+                },
+            },
+            options
+        )
+        const abis = await request.fetchAbis()
+        const tx = await request.resolveTransaction(
+            abis,
+            {actor: 'foo', permission: 'bar'},
+            {
+                timestamp: '2022-11-01T00:19:33.500',
+                block_num: 211598529,
+                expire_seconds: 60,
+                ref_block_prefix: 3524347598,
+            }
+        )
+        assert.deepStrictEqual(recode(tx), {
+            actions: [
+                {
+                    account: 'eosio.token',
+                    name: 'transfer',
+                    authorization: [{actor: 'foo', permission: 'active'}],
+                    data: {from: 'foo', to: 'bar', quantity: '1.000 EOS', memo: 'hello there'},
+                },
+            ],
+            context_free_actions: [],
+            transaction_extensions: [],
+            expiration: '2022-11-01T00:20:34',
+            ref_block_num: 48321,
+            ref_block_prefix: 3524347598,
+            max_cpu_usage_ms: 0,
+            max_net_usage_words: 0,
+            delay_sec: 0,
+        })
+    })
+
     it('should resolve with placeholder name', async function () {
         const request = await SigningRequest.create(
             {
