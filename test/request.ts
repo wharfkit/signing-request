@@ -198,10 +198,10 @@ describe('signing request', function () {
             abis,
             {actor: 'foo', permission: 'bar'},
             {
-                timestamp,
-                block_num: 1234,
-                expire_seconds: 0,
-                ref_block_prefix: 56789,
+                timestamp: '2022-11-01T00:19:33.500',
+                block_num: 211598529,
+                expire_seconds: 60,
+                ref_block_prefix: 3524347598,
             }
         )
         assert.deepStrictEqual(recode(tx), {
