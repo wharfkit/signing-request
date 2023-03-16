@@ -537,10 +537,8 @@ export class SigningRequest {
         if (typeof uri !== 'string') {
             throw new Error('Invalid request uri')
         }
-        const [scheme, path] = uri.split(':')
-        if (scheme !== 'esr' && scheme !== 'web+esr') {
-            throw new Error('Invalid scheme')
-        }
+        const [, path] = uri.split(':')
+
         const data = base64u.decode(path.startsWith('//') ? path.slice(2) : path)
         return SigningRequest.fromData(data, options)
     }
@@ -655,7 +653,7 @@ export class SigningRequest {
      *                   Defaults to true.
      * @returns An esr uri string.
      */
-    public encode(compress?: boolean, slashes?: boolean): string {
+    public encode(compress?: boolean, slashes?: boolean, scheme: string = 'esr:'): string {
         const shouldCompress = compress !== undefined ? compress : this.zlib !== undefined
         if (shouldCompress && this.zlib === undefined) {
             throw new Error('Need zlib to compress')
@@ -676,7 +674,6 @@ export class SigningRequest {
         const out = new Uint8Array(1 + array.byteLength)
         out[0] = header
         out.set(array, 1)
-        let scheme = 'esr:'
         if (slashes !== false) {
             scheme += '//'
         }
