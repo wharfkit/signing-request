@@ -33,7 +33,7 @@ import {
     UInt32Type,
     UInt8,
     VarUInt,
-} from '@greymass/eosio'
+} from '@wharfkit/antelope'
 
 import * as base64u from './base64u'
 import {ChainAlias, ChainId, ChainIdType, ChainIdVariant, ChainName} from './chain-id'

@@ -12,7 +12,7 @@ import {
     SigningRequestEncodingOptions,
 } from '../src'
 import * as TSModule from '../src'
-import {Name, PrivateKey, Serializer, Signature, UInt64} from '@greymass/eosio'
+import {Name, PrivateKey, Serializer, Signature, UInt64} from '@wharfkit/antelope'
 import {IdentityProof} from '../src/identity-proof'
 
 let {SigningRequest, PlaceholderAuth, PlaceholderName} = TSModule
