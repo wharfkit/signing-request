@@ -16,7 +16,7 @@
         "prepare": "make"
     },
     "dependencies": {
-        "@wharfkit/antelope": "^0.9.0-rc2",
+        "@wharfkit/antelope": "^1.0.0",
         "tslib": "^2.0.3"
     },
     "devDependencies": {
