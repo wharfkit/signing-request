@@ -15,7 +15,7 @@ import {
     TimePointSec,
     TimePointType,
     Transaction,
-} from '@greymass/eosio'
+} from '@wharfkit/antelope'
 
 import {IdentityV3} from './abi'
 import {ChainId, ChainIdType} from './chain-id'

@@ -5,7 +5,7 @@ import {
     TypeAlias,
     UInt8,
     Variant,
-} from '@greymass/eosio'
+} from '@wharfkit/antelope'
 
 /** Chain ID aliases. */
 export enum ChainName {

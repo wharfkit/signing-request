@@ -11,7 +11,7 @@ import {
     TypeAlias,
     UInt8,
     Variant,
-} from '@greymass/eosio'
+} from '@wharfkit/antelope'
 
 import {ChainIdVariant} from './chain-id'
 

@@ -1,7 +1,7 @@
 import {readdirSync as readdir, readFileSync as readfile} from 'fs'
 import {join as joinPath} from 'path'
 import {AbiProvider} from '../../src'
-import {Name} from '@greymass/eosio'
+import {Name} from '@wharfkit/antelope'
 
 // To add an ABI for testing run (in project root):
 // CONTRACT=eosio.token; cleos -u https://eos.greymass.com get abi $CONTRACT > test/abis/$CONTRACT.json
